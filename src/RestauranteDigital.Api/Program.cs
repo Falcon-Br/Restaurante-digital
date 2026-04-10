@@ -85,6 +85,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 app.MapHub<RestauranteDigital.Api.Hubs.RestauranteHub>("/hubs/restaurante");
+app.MapGet("/api/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }));
 
 // Migrate + Seed roles
 if (!app.Environment.IsEnvironment("Testing"))
