@@ -45,7 +45,7 @@ public class ItensController(AppDbContext db) : ControllerBase
         db.Itens.Add(item);
         await db.SaveChangesAsync();
 
-        return CreatedAtAction(nameof(GetAll),
+        return CreatedAtAction(nameof(GetAll), null,
             new ItemResponse(item.Id, item.CategoriaId, cat.Nome,
                 item.Nome, item.Descricao, item.Preco, item.ImagemUrl, item.Disponivel));
     }

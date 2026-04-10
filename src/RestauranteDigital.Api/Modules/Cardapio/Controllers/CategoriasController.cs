@@ -28,7 +28,7 @@ public class CategoriasController(AppDbContext db) : ControllerBase
         var cat = new Categoria { Nome = request.Nome, Ordem = request.Ordem };
         db.Categorias.Add(cat);
         await db.SaveChangesAsync();
-        return CreatedAtAction(nameof(GetAll), new CategoriaResponse(cat.Id, cat.Nome, cat.Ordem));
+        return CreatedAtAction(nameof(GetAll), null, new CategoriaResponse(cat.Id, cat.Nome, cat.Ordem));
     }
 
     [HttpPut("{id}")]
