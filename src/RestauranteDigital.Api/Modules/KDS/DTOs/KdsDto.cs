@@ -4,7 +4,7 @@ namespace RestauranteDigital.Api.Modules.KDS.DTOs;
 
 public record KdsPedidoItemResponse(
     int PedidoItemId, int PedidoId, int MesaNumero,
-    string ItemNome, int Quantidade, string? Observacao,
+    int ItemId, string ItemNome, int Quantidade, string? Observacao,
     PedidoItemStatus Status, DateTime CriadoEm, int MinutosEspera);
 
 public record KdsFilaResponse(

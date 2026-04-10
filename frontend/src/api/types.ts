@@ -58,6 +58,7 @@ export interface KdsPedidoItem {
   pedidoItemId: number
   pedidoId: number
   mesaNumero: number
+  itemId: number
   itemNome: string
   quantidade: number
   observacao: string | null

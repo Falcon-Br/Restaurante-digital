@@ -29,7 +29,7 @@ public class KdsController(AppDbContext db, IHubContext<RestauranteHub> hub) : C
         var agora = DateTime.UtcNow;
         var response = itens.Select(pi => new KdsPedidoItemResponse(
             pi.Id, pi.PedidoId, pi.Pedido.Mesa.Numero,
-            pi.Item.Nome, pi.Quantidade, pi.Observacao,
+            pi.ItemId, pi.Item.Nome, pi.Quantidade, pi.Observacao,
             pi.Status, pi.CriadoEm,
             (int)(agora - pi.CriadoEm).TotalMinutes)).ToList();
 
@@ -57,7 +57,7 @@ public class KdsController(AppDbContext db, IHubContext<RestauranteHub> hub) : C
         var agora = DateTime.UtcNow;
         return Ok(new KdsPedidoItemResponse(
             pi.Id, pi.PedidoId, pi.Pedido.Mesa.Numero,
-            pi.Item.Nome, pi.Quantidade, pi.Observacao,
+            pi.ItemId, pi.Item.Nome, pi.Quantidade, pi.Observacao,
             pi.Status, pi.CriadoEm,
             (int)(agora - pi.CriadoEm).TotalMinutes));
     }
