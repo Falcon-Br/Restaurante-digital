@@ -100,6 +100,24 @@ if (!app.Environment.IsEnvironment("Testing"))
             if (!await roleManager.RoleExistsAsync(role))
                 await roleManager.CreateAsync(new IdentityRole(role));
         }
+
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var seedUsers = new[]
+        {
+            (Nome: "Admin",    Email: "admin@restaurante.com",   Senha: "123456", Role: "Admin"),
+            (Nome: "Garçom",   Email: "garcom@restaurante.com",  Senha: "123456", Role: "Garcom"),
+            (Nome: "Cozinha",  Email: "cozinha@restaurante.com", Senha: "123456", Role: "Cozinha"),
+            (Nome: "Gerente",  Email: "gerente@restaurante.com", Senha: "123456", Role: "Gerente"),
+        };
+        foreach (var (nome, email, senha, role) in seedUsers)
+        {
+            if (await userManager.FindByEmailAsync(email) is null)
+            {
+                var user = new ApplicationUser { UserName = email, Email = email, Nome = nome };
+                await userManager.CreateAsync(user, senha);
+                await userManager.AddToRoleAsync(user, role);
+            }
+        }
     }
 }
 
