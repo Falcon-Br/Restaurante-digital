@@ -71,3 +71,28 @@ export interface KdsFilaResponse {
   itens: KdsPedidoItem[]
   tempoMedioMinutos: number
 }
+
+export interface ItemMaisVendido {
+  itemId: number
+  itemNome: string
+  quantidadeTotal: number
+  totalGerado: number
+}
+
+export interface ResumoVendasResponse {
+  de: string
+  ate: string
+  totalPedidos: number
+  totalFaturado: number
+  tempoMedioMinutos: number
+  itensMaisVendidos: ItemMaisVendido[]
+}
+
+export interface PedidoResumo {
+  id: number
+  mesaNumero: number
+  criadoEm: string
+  totalFinal: number | null
+  status: string
+  numeroItens: number
+}
