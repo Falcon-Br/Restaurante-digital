@@ -68,6 +68,7 @@ builder.Services.AddCors(options =>
 // Services
 builder.Services.AddScoped<TokenService>();
 
+builder.Services.AddSignalR();
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
@@ -83,6 +84,7 @@ app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHub<RestauranteDigital.Api.Hubs.RestauranteHub>("/hubs/restaurante");
 
 // Seed roles
 if (!app.Environment.IsEnvironment("Testing"))
