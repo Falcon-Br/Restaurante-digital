@@ -8,4 +8,6 @@ public class RestauranteHub : Hub
     // NovoPedido(int pedidoId, int mesaNumero, string[] itens)
     // StatusAtualizado(int pedidoItemId, string novoStatus)
     // ItemEsgotado(int itemId, string itemNome)
+    // ItemDisponivel(int itemId, string itemNome)
+    // PedidoFechado(int pedidoId)
 }

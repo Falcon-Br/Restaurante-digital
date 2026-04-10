@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using RestauranteDigital.Api.Data;
+using RestauranteDigital.Api.Hubs;
 using RestauranteDigital.Api.Modules.Cardapio.DTOs;
 using RestauranteDigital.Api.Modules.Cardapio.Models;
 
@@ -9,7 +11,7 @@ namespace RestauranteDigital.Api.Modules.Cardapio.Controllers;
 
 [ApiController]
 [Route("api/itens")]
-public class ItensController(AppDbContext db) : ControllerBase
+public class ItensController(AppDbContext db, IHubContext<RestauranteHub> hub) : ControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] int? categoriaId)
@@ -77,6 +79,11 @@ public class ItensController(AppDbContext db) : ControllerBase
 
         item.Disponivel = !item.Disponivel;
         await db.SaveChangesAsync();
+
+        if (item.Disponivel)
+            await hub.Clients.All.SendAsync("ItemDisponivel", item.Id, item.Nome);
+        else
+            await hub.Clients.All.SendAsync("ItemEsgotado", item.Id, item.Nome);
 
         return Ok(new ItemResponse(item.Id, item.CategoriaId, item.Categoria.Nome,
             item.Nome, item.Descricao, item.Preco, item.ImagemUrl, item.Disponivel));

@@ -87,4 +87,119 @@ public class PedidosControllerTests : TestBase
         var pedidos = await response.Content.ReadFromJsonAsync<List<PedidoResponse>>();
         pedidos.Should().HaveCount(1);
     }
+
+    private async Task<string> AuthAsCozinha(string suffix = "")
+    {
+        await Client.PostAsJsonAsync("/api/auth/register",
+            new RegisterRequest("Cozinha", $"cozinha{suffix}@test.com", "senha123", "Cozinha"));
+        var resp = await Client.PostAsJsonAsync("/api/auth/login",
+            new LoginRequest($"cozinha{suffix}@test.com", "senha123"));
+        var data = await resp.Content.ReadFromJsonAsync<LoginResponse>();
+        return data!.Token;
+    }
+
+    private async Task<PedidoResponse> SeedPedido(string adminToken)
+    {
+        var (mesaToken, itemId) = await SeedData(adminToken);
+        Client.DefaultRequestHeaders.Authorization = null;
+        var resp = await Client.PostAsJsonAsync("/api/pedidos",
+            new CriarPedidoRequest(mesaToken, [new PedidoItemRequest(itemId, 1, null)]));
+        return (await resp.Content.ReadFromJsonAsync<PedidoResponse>())!;
+    }
+
+    [Fact]
+    public async Task CancelarItem_ItemExistente_Remove204()
+    {
+        var adminToken = await AuthAsAdmin();
+        var pedido = await SeedPedido(adminToken);
+        var pedidoItemId = pedido.Itens[0].Id;
+
+        var cozinhaToken = await AuthAsCozinha("cancelitem");
+        Client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", cozinhaToken);
+
+        var response = await Client.DeleteAsync($"/api/pedidos/{pedido.Id}/itens/{pedidoItemId}");
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+    }
+
+    [Fact]
+    public async Task CancelarItem_ItemNaoEncontrado_Returns404()
+    {
+        var adminToken = await AuthAsAdmin();
+        var pedido = await SeedPedido(adminToken);
+
+        var cozinhaToken = await AuthAsCozinha("cancelitem404");
+        Client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", cozinhaToken);
+
+        var response = await Client.DeleteAsync($"/api/pedidos/{pedido.Id}/itens/99999");
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task CancelarItem_PedidoFechado_Returns400()
+    {
+        var adminToken = await AuthAsAdmin();
+        var pedido = await SeedPedido(adminToken);
+        var pedidoItemId = pedido.Itens[0].Id;
+
+        // Fechar o pedido como Admin
+        Client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", adminToken);
+        await Client.PostAsJsonAsync($"/api/pedidos/{pedido.Id}/fechar", new { });
+
+        var cozinhaToken = await AuthAsCozinha("cancelitemfechado");
+        Client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", cozinhaToken);
+
+        var response = await Client.DeleteAsync($"/api/pedidos/{pedido.Id}/itens/{pedidoItemId}");
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task CancelarPedido_PedidoExistente_Remove204()
+    {
+        var adminToken = await AuthAsAdmin();
+        var pedido = await SeedPedido(adminToken);
+
+        var cozinhaToken = await AuthAsCozinha("cancelpedido");
+        Client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", cozinhaToken);
+
+        var response = await Client.DeleteAsync($"/api/pedidos/{pedido.Id}");
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+    }
+
+    [Fact]
+    public async Task CancelarPedido_PedidoNaoEncontrado_Returns404()
+    {
+        var adminToken = await AuthAsAdmin();
+        _ = adminToken; // register admin to init db
+
+        var cozinhaToken = await AuthAsCozinha("cancelpedido404");
+        Client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", cozinhaToken);
+
+        var response = await Client.DeleteAsync("/api/pedidos/99999");
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task CancelarPedido_PedidoFechado_Returns400()
+    {
+        var adminToken = await AuthAsAdmin();
+        var pedido = await SeedPedido(adminToken);
+
+        // Fechar o pedido como Admin
+        Client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", adminToken);
+        await Client.PostAsJsonAsync($"/api/pedidos/{pedido.Id}/fechar", new { });
+
+        var cozinhaToken = await AuthAsCozinha("cancelpedidofechado");
+        Client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", cozinhaToken);
+
+        var response = await Client.DeleteAsync($"/api/pedidos/{pedido.Id}");
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
 }
