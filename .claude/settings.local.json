@@ -6,7 +6,10 @@
       "Bash(dotnet sln:*)",
       "Bash(dotnet add:*)",
       "Bash(rm:*)",
-      "Bash(dotnet build:*)"
+      "Bash(dotnet build:*)",
+      "Bash(git:*)",
+      "Bash(dotnet package search:*)",
+      "Bash(dotnet test:*)"
     ]
   }
 }
