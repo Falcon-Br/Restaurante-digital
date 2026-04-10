@@ -86,11 +86,14 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapHub<RestauranteDigital.Api.Hubs.RestauranteHub>("/hubs/restaurante");
 
-// Seed roles
+// Migrate + Seed roles
 if (!app.Environment.IsEnvironment("Testing"))
 {
     using (var scope = app.Services.CreateScope())
     {
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.Database.Migrate();
+
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
         foreach (var role in new[] { "Garcom", "Cozinha", "Admin", "Gerente" })
         {

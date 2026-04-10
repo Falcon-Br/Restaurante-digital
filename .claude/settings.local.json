@@ -13,7 +13,14 @@
       "Bash(mkdir -p \"D:/Projetos Pessoais/Restaurante digital/src/RestauranteDigital.Api/Modules/Auth/Models\")",
       "Bash(mkdir -p \"D:/Projetos Pessoais/Restaurante digital/src/RestauranteDigital.Api/Modules/Cardapio/Models\")",
       "Bash(mkdir -p \"D:/Projetos Pessoais/Restaurante digital/src/RestauranteDigital.Api/Modules/Mesas/Models\")",
-      "Bash(dotnet ef:*)"
+      "Bash(dotnet ef:*)",
+      "Bash(npm create:*)",
+      "Bash(npm install:*)",
+      "Bash(npx tailwindcss:*)",
+      "Bash(npx --yes tailwindcss init -p)",
+      "Bash(npm list:*)",
+      "Bash(npm run:*)",
+      "Bash(dotnet run:*)"
     ]
   }
 }

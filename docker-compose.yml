@@ -1,0 +1,49 @@
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: restaurante_digital
+      POSTGRES_USER: restaurante
+      POSTGRES_PASSWORD: restaurante123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U restaurante -d restaurante_digital"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./src/RestauranteDigital.Api
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      ConnectionStrings__Default: "Host=db;Port=5432;Database=restaurante_digital;Username=restaurante;Password=restaurante123"
+      Jwt__Secret: "restaurante-digital-jwt-secret-super-seguro-2026"
+      Jwt__Issuer: "RestauranteDigital"
+      Jwt__Audience: "RestauranteDigital"
+      App__BaseUrl: "http://localhost:8080"
+      App__FrontendUrl: "http://localhost:3000"
+      ASPNETCORE_ENVIRONMENT: "Production"
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
