@@ -95,14 +95,17 @@ public class PedidosController(AppDbContext db, IHubContext<RestauranteHub> hub)
         var pedidoItem = pedido.Itens.FirstOrDefault(i => i.Id == itemId);
         if (pedidoItem is null) return NotFound();
 
-        db.PedidoItens.Remove(pedidoItem);
-
         if (pedido.Itens.Count == 1)
-            db.Pedidos.Remove(pedido);
+            db.Pedidos.Remove(pedido);  // EF cascade removes the single PedidoItem
+        else
+            db.PedidoItens.Remove(pedidoItem);
 
         await db.SaveChangesAsync();
 
-        await hub.Clients.All.SendAsync("StatusAtualizado", itemId, "Cancelado");
+        if (pedido.Itens.Count == 1)
+            await hub.Clients.All.SendAsync("PedidoCancelado", pedido.Id);
+        else
+            await hub.Clients.All.SendAsync("StatusAtualizado", itemId, "Cancelado");
 
         return NoContent();
     }
@@ -119,6 +122,8 @@ public class PedidosController(AppDbContext db, IHubContext<RestauranteHub> hub)
         db.PedidoItens.RemoveRange(pedido.Itens);
         db.Pedidos.Remove(pedido);
         await db.SaveChangesAsync();
+
+        await hub.Clients.All.SendAsync("PedidoCancelado", id);
 
         return NoContent();
     }

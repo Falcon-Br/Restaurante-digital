@@ -10,4 +10,5 @@ public class RestauranteHub : Hub
     // ItemEsgotado(int itemId, string itemNome)
     // ItemDisponivel(int itemId, string itemNome)
     // PedidoFechado(int pedidoId)
+    // PedidoCancelado(int pedidoId)
 }
