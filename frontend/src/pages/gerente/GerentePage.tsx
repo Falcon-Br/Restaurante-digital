@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../api/client'
 import { useAuth } from '../../context/AuthContext'
+import { useSignalR } from '../../hooks/useSignalR'
 import type { ResumoVendasResponse, PedidoResumo } from '../../api/types'
 
 export function GerentePage() {
@@ -23,6 +24,10 @@ export function GerentePage() {
   }
 
   useEffect(() => { carregar() }, [])
+
+  useSignalR({
+    onPedidoFechado: () => carregar(),
+  })
 
   return (
     <div className="min-h-screen bg-gray-50">

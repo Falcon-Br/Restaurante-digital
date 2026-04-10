@@ -16,6 +16,7 @@ export function CozinhaPage() {
   const [tempoMedio, setTempoMedio] = useState(0)
   const [erro, setErro] = useState('')
   const itensRef = useRef<KdsPedidoItem[]>([])
+  const [modalEsgotado, setModalEsgotado] = useState<{ itemId: number; itemNome: string } | null>(null)
 
   const carregarFila = useCallback(async () => {
     try {
@@ -30,7 +31,6 @@ export function CozinhaPage() {
 
   useEffect(() => {
     carregarFila()
-    // Atualiza minutosEspera a cada 30s sem precisar recarregar a página
     const interval = setInterval(() => {
       setItens(prev => prev.map(i => ({
         ...i,
@@ -48,15 +48,17 @@ export function CozinhaPage() {
 
   const marcarPronto = async (pedidoItemId: number) => {
     try {
-      await api.patch(`/kds/${pedidoItemId}/status`, { novoStatus: 2 }) // 2 = Pronto
+      await api.patch(`/kds/${pedidoItemId}/status`, { novoStatus: 2 })
       setItens(prev => prev.filter(i => i.pedidoItemId !== pedidoItemId))
     } catch {
       setErro('Erro ao marcar como pronto.')
     }
   }
 
-  const marcarEsgotado = async (itemId: number, itemNome: string) => {
-    if (!confirm(`Marcar "${itemNome}" como esgotado?`)) return
+  const confirmarEsgotado = async () => {
+    if (!modalEsgotado) return
+    const { itemId } = modalEsgotado
+    setModalEsgotado(null)
     try {
       await api.patch(`/kds/${itemId}/esgotado`, {})
       setItens(prev => prev.filter(i => i.itemId !== itemId))
@@ -64,6 +66,31 @@ export function CozinhaPage() {
       setErro('Erro ao marcar como esgotado.')
     }
   }
+
+  const cancelarItem = async (pedidoId: number, pedidoItemId: number) => {
+    try {
+      await api.delete(`/pedidos/${pedidoId}/itens/${pedidoItemId}`)
+      setItens(prev => prev.filter(i => i.pedidoItemId !== pedidoItemId))
+    } catch {
+      setErro('Erro ao cancelar item.')
+    }
+  }
+
+  const cancelarPedido = async (pedidoId: number) => {
+    try {
+      await api.delete(`/pedidos/${pedidoId}`)
+      setItens(prev => prev.filter(i => i.pedidoId !== pedidoId))
+    } catch {
+      setErro('Erro ao cancelar pedido.')
+    }
+  }
+
+  // Group items by pedidoId
+  const grupos = itens.reduce<Record<number, KdsPedidoItem[]>>((acc, item) => {
+    if (!acc[item.pedidoId]) acc[item.pedidoId] = []
+    acc[item.pedidoId].push(item)
+    return acc
+  }, {})
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
@@ -89,31 +116,76 @@ export function CozinhaPage() {
           <p className="text-gray-500 text-xl">Nenhum pedido na fila ✅</p>
         </div>
       ) : (
-        <div className="p-4 flex flex-col gap-3">
-          {itens.map(item => (
-            <div key={item.pedidoItemId}
-              className={`rounded-xl p-4 flex items-center gap-4 shadow-md ${urgenciaBg(item.minutosEspera)}`}
-            >
-              <div className="text-4xl font-black w-12 text-center">{item.mesaNumero}</div>
-              <div className="flex-1">
-                <div className="font-bold text-lg">{item.quantidade}× {item.itemNome}</div>
-                {item.observacao && (
-                  <div className="text-sm opacity-75 mt-0.5">📝 {item.observacao}</div>
-                )}
-                <div className="text-sm opacity-60 mt-1">⏱ {item.minutosEspera} min</div>
+        <div className="p-4 flex flex-col gap-6">
+          {Object.entries(grupos).map(([pedidoIdStr, pedidoItens]) => {
+            const pedidoId = Number(pedidoIdStr)
+            const mesa = pedidoItens[0].mesaNumero
+            return (
+              <div key={pedidoId} className="flex flex-col gap-2">
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-gray-300 text-sm font-semibold uppercase tracking-wide">
+                    Mesa {mesa} — Pedido #{pedidoId}
+                  </span>
+                  <button
+                    onClick={() => cancelarPedido(pedidoId)}
+                    className="bg-red-700 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-red-800 font-semibold"
+                  >
+                    ✕ Cancelar pedido
+                  </button>
+                </div>
+                {pedidoItens.map(item => (
+                  <div key={item.pedidoItemId}
+                    className={`rounded-xl p-4 flex items-center gap-4 shadow-md ${urgenciaBg(item.minutosEspera)}`}
+                  >
+                    <div className="text-4xl font-black w-12 text-center">{item.mesaNumero}</div>
+                    <div className="flex-1">
+                      <div className="font-bold text-lg">{item.quantidade}× {item.itemNome}</div>
+                      {item.observacao && (
+                        <div className="text-sm opacity-75 mt-0.5">📝 {item.observacao}</div>
+                      )}
+                      <div className="text-sm opacity-60 mt-1">⏱ {item.minutosEspera} min</div>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <button onClick={() => marcarPronto(item.pedidoItemId)}
+                        className="bg-green-500 text-white font-bold px-5 py-3 rounded-lg text-lg hover:bg-green-600 active:scale-95 transition-transform">
+                        ✓ PRONTO
+                      </button>
+                      <button onClick={() => setModalEsgotado({ itemId: item.itemId, itemNome: item.itemNome })}
+                        className="bg-gray-600 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-gray-700">
+                        Esgotado
+                      </button>
+                      <button onClick={() => cancelarItem(item.pedidoId, item.pedidoItemId)}
+                        className="bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-red-700">
+                        ✕ Cancelar
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div className="flex flex-col gap-2">
-                <button onClick={() => marcarPronto(item.pedidoItemId)}
-                  className="bg-green-500 text-white font-bold px-5 py-3 rounded-lg text-lg hover:bg-green-600 active:scale-95 transition-transform">
-                  ✓ PRONTO
-                </button>
-                <button onClick={() => marcarEsgotado(item.itemId, item.itemNome)}
-                  className="bg-gray-600 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-gray-700">
-                  Esgotado
-                </button>
-              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Modal confirmação esgotado */}
+      {modalEsgotado && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-30 p-4">
+          <div className="bg-white text-black rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+            <h3 className="text-lg font-bold mb-2 text-center">Marcar como esgotado?</h3>
+            <p className="text-sm text-gray-600 text-center mb-6">
+              Tem certeza que deseja marcar <strong>{modalEsgotado.itemNome}</strong> como esgotado?
+            </p>
+            <div className="flex flex-col gap-3">
+              <button onClick={confirmarEsgotado}
+                className="w-full bg-gray-800 text-white py-3 rounded-xl font-semibold hover:bg-gray-900">
+                Confirmar
+              </button>
+              <button onClick={() => setModalEsgotado(null)}
+                className="w-full border-2 border-gray-300 text-gray-600 py-3 rounded-xl font-semibold hover:bg-gray-50">
+                Cancelar
+              </button>
             </div>
-          ))}
+          </div>
         </div>
       )}
     </div>

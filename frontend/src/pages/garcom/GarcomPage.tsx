@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../api/client'
 import { useAuth } from '../../context/AuthContext'
+import { useSignalR } from '../../hooks/useSignalR'
 import type { Mesa, Pedido, Item, Categoria } from '../../api/types'
 
 type CartItem = { itemId: number; nome: string; preco: number; quantidade: number; observacao: string }
@@ -15,6 +16,15 @@ export function GarcomPage() {
   const [cart, setCart] = useState<CartItem[]>([])
   const [mostrarCart, setMostrarCart] = useState(false)
   const [modalComanda, setModalComanda] = useState(false)
+
+  useSignalR({
+    onItemEsgotado: (itemId) => {
+      setItens(prev => prev.map(i => i.id === itemId ? { ...i, disponivel: false } : i))
+    },
+    onItemDisponivel: (itemId) => {
+      setItens(prev => prev.map(i => i.id === itemId ? { ...i, disponivel: true } : i))
+    },
+  })
 
   const carregarMesas = async () => {
     const { data } = await api.get<Mesa[]>('/mesas')
@@ -160,14 +170,19 @@ export function GarcomPage() {
         {categorias.map(cat => (
           <div key={cat.id} className="mb-4">
             <h3 className="text-sm font-medium text-gray-500 uppercase mb-2">{cat.nome}</h3>
-            {itens.filter(i => i.categoriaId === cat.id && i.disponivel).map(item => (
-              <div key={item.id} className="bg-white rounded-lg p-3 flex justify-between items-center mb-2 shadow-sm">
+            {itens.filter(i => i.categoriaId === cat.id).map(item => (
+              <div key={item.id} className={`bg-white rounded-lg p-3 flex justify-between items-center mb-2 shadow-sm ${!item.disponivel ? 'opacity-50' : ''}`}>
                 <div>
-                  <div className="font-medium">{item.nome}</div>
+                  <div className="font-medium flex items-center gap-2">
+                    {item.nome}
+                    {!item.disponivel && (
+                      <span className="text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded font-semibold">Esgotado</span>
+                    )}
+                  </div>
                   <div className="text-sm text-red-600">R$ {item.preco.toFixed(2).replace('.', ',')}</div>
                 </div>
-                <button onClick={() => adicionarItem(item)}
-                  className="bg-red-600 text-white w-9 h-9 rounded-full text-xl font-bold">+</button>
+                <button onClick={() => adicionarItem(item)} disabled={!item.disponivel}
+                  className="bg-red-600 text-white w-9 h-9 rounded-full text-xl font-bold disabled:opacity-40 disabled:cursor-not-allowed">+</button>
               </div>
             ))}
           </div>
@@ -201,7 +216,7 @@ export function GarcomPage() {
               className="border rounded-xl px-4 py-3 text-sm font-semibold text-gray-600">
               {mostrarCart ? 'Fechar' : `Ver ${cart.reduce((a, c) => a + c.quantidade, 0)} itens`}
             </button>
-            <button onClick={() => setModalComanda(true)}
+            <button onClick={() => cart.length === 1 ? enviarPedido(false) : setModalComanda(true)}
               className="flex-1 bg-red-600 text-white py-3 rounded-xl font-bold">
               Enviar — R$ {totalCart.toFixed(2).replace('.', ',')}
             </button>

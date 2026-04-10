@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../api/client'
 import { useAuth } from '../../context/AuthContext'
+import { useSignalR } from '../../hooks/useSignalR'
 import type { Item, Categoria, Mesa } from '../../api/types'
 
 type Tab = 'cardapio' | 'mesas'
@@ -34,6 +35,15 @@ export function AdminPage() {
   const [mesas, setMesas] = useState<Mesa[]>([])
   const [novoNumeroMesa, setNovoNumeroMesa] = useState('')
   const [salvandoMesa, setSalvandoMesa] = useState(false)
+
+  useSignalR({
+    onItemEsgotado: (itemId) => {
+      setItens(prev => prev.map(i => i.id === itemId ? { ...i, disponivel: false } : i))
+    },
+    onItemDisponivel: (itemId) => {
+      setItens(prev => prev.map(i => i.id === itemId ? { ...i, disponivel: true } : i))
+    },
+  })
 
   const carregarCardapio = async () => {
     const [i, c] = await Promise.all([api.get<Item[]>('/itens'), api.get<Categoria[]>('/categorias')])
