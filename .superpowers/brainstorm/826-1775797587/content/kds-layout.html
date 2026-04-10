@@ -1,0 +1,98 @@
+<h2>Layout do KDS — Interface da Cozinha</h2>
+<p class="subtitle">Qual organização visual facilita mais o trabalho na cozinha?</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#1a1a2e;padding:12px;border-radius:6px;font-family:monospace;font-size:11px">
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <div style="background:#e63946;color:#fff;padding:4px 8px;border-radius:4px;font-size:10px">🔴 URGENTE</div>
+          <div style="background:#f4a261;color:#000;padding:4px 8px;border-radius:4px;font-size:10px">🟡 AGUARDANDO</div>
+          <div style="background:#2a9d8f;color:#fff;padding:4px 8px;border-radius:4px;font-size:10px">🟢 PRONTO</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+          <div style="background:#e63946;color:#fff;padding:8px;border-radius:6px;text-align:center">
+            <div style="font-size:16px;font-weight:bold">Mesa 3</div>
+            <div style="font-size:10px;margin-top:4px">• X-Burguer x2<br>• Fritas x2</div>
+            <div style="margin-top:6px;background:rgba(0,0,0,0.3);border-radius:4px;padding:3px;font-size:10px">⏱ 18 min</div>
+          </div>
+          <div style="background:#f4a261;color:#000;padding:8px;border-radius:6px;text-align:center">
+            <div style="font-size:16px;font-weight:bold">Mesa 7</div>
+            <div style="font-size:10px;margin-top:4px">• Salada Caesar<br>• Suco x3</div>
+            <div style="margin-top:6px;background:rgba(0,0,0,0.3);border-radius:4px;padding:3px;font-size:10px">⏱ 8 min</div>
+          </div>
+          <div style="background:#264653;color:#fff;padding:8px;border-radius:6px;text-align:center">
+            <div style="font-size:16px;font-weight:bold">Mesa 1</div>
+            <div style="font-size:10px;margin-top:4px">• Picanha<br>• Cerveja x2</div>
+            <div style="margin-top:6px;background:rgba(0,0,0,0.3);border-radius:4px;padding:3px;font-size:10px">⏱ 2 min</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Grade por Urgência</h3>
+      <p>Cards coloridos ordenados por tempo de espera. Vermelho = atrasado, amarelo = normal, verde = novo. Um clique marca como pronto.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#1a1a2e;padding:12px;border-radius:6px;font-family:monospace;font-size:11px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          <div>
+            <div style="color:#f4a261;font-size:11px;font-weight:bold;margin-bottom:4px;border-bottom:1px solid #f4a261;padding-bottom:2px">EM PREPARO</div>
+            <div style="background:#264653;color:#fff;padding:6px;border-radius:4px;margin-bottom:4px;font-size:10px">
+              <span style="background:#e63946;padding:1px 5px;border-radius:3px;margin-right:4px">M3</span> X-Burguer x2 · <span style="color:#f4a261">18min</span>
+            </div>
+            <div style="background:#264653;color:#fff;padding:6px;border-radius:4px;font-size:10px">
+              <span style="background:#f4a261;color:#000;padding:1px 5px;border-radius:3px;margin-right:4px">M7</span> Salada · <span style="color:#aaa">8min</span>
+            </div>
+          </div>
+          <div>
+            <div style="color:#2a9d8f;font-size:11px;font-weight:bold;margin-bottom:4px;border-bottom:1px solid #2a9d8f;padding-bottom:2px">PRONTOS</div>
+            <div style="background:#264653;color:#aaa;padding:6px;border-radius:4px;font-size:10px;text-decoration:line-through">
+              <span style="padding:1px 5px;border-radius:3px;margin-right:4px;background:#555">M5</span> Pizza
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Colunas Kanban</h3>
+      <p>Duas colunas: "Em Preparo" e "Prontos". Items se movem entre colunas com um toque. Layout mais compacto, vê mais pedidos de uma vez.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#1a1a2e;padding:12px;border-radius:6px;font-family:monospace;font-size:11px">
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <div style="display:flex;align-items:center;gap:8px;background:#e63946;color:#fff;padding:8px;border-radius:6px">
+            <div style="font-size:20px;font-weight:bold;width:36px;text-align:center">3</div>
+            <div style="flex:1">
+              <div style="font-weight:bold">Mesa 3 · X-Burguer x2, Fritas x2</div>
+              <div style="font-size:10px;opacity:0.8">Pedido #047 · há 18 minutos</div>
+            </div>
+            <button style="background:rgba(255,255,255,0.2);border:none;color:#fff;padding:6px 12px;border-radius:4px;cursor:pointer;font-size:11px">✓ PRONTO</button>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;background:#f4a261;color:#000;padding:8px;border-radius:6px">
+            <div style="font-size:20px;font-weight:bold;width:36px;text-align:center">7</div>
+            <div style="flex:1">
+              <div style="font-weight:bold">Mesa 7 · Salada Caesar, Suco x3</div>
+              <div style="font-size:10px;opacity:0.7">Pedido #048 · há 8 minutos</div>
+            </div>
+            <button style="background:rgba(0,0,0,0.15);border:none;color:#000;padding:6px 12px;border-radius:4px;cursor:pointer;font-size:11px">✓ PRONTO</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Lista Linear com Ação</h3>
+      <p>Linhas ordenadas cronologicamente, mais antigas no topo. Botão "Pronto" visível em cada linha. Simples e sequencial — ideal para cozinhas menores.</p>
+    </div>
+  </div>
+
+</div>
+
+<p style="margin-top:16px;font-size:12px;color:#888;text-align:center">Clique em uma opção para selecionar, depois me diga o que preferiu no terminal.</p>
