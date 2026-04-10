@@ -9,7 +9,10 @@
       "Bash(dotnet build:*)",
       "Bash(git:*)",
       "Bash(dotnet package search:*)",
-      "Bash(dotnet test:*)"
+      "Bash(dotnet test:*)",
+      "Bash(mkdir -p \"D:/Projetos Pessoais/Restaurante digital/src/RestauranteDigital.Api/Modules/Auth/Models\")",
+      "Bash(mkdir -p \"D:/Projetos Pessoais/Restaurante digital/src/RestauranteDigital.Api/Modules/Cardapio/Models\")",
+      "Bash(mkdir -p \"D:/Projetos Pessoais/Restaurante digital/src/RestauranteDigital.Api/Modules/Mesas/Models\")"
     ]
   }
 }
