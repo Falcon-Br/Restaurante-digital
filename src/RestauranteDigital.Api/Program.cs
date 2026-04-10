@@ -24,7 +24,10 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 .AddDefaultTokenProviders();
 
 // JWT
-var jwtSecret = builder.Configuration["Jwt:Secret"]!;
+var rawSecret = builder.Configuration["Jwt:Secret"];
+if (string.IsNullOrWhiteSpace(rawSecret) || rawSecret.Length < 32)
+    throw new InvalidOperationException("Jwt:Secret must be configured and at least 32 characters long.");
+var jwtSecret = rawSecret;
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
