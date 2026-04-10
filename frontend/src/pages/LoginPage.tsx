@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
@@ -18,10 +18,11 @@ export function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  if (user) {
-    navigate(roleRedirect[user.role] ?? '/login', { replace: true })
-    return null
-  }
+  useEffect(() => {
+    if (user) {
+      navigate(roleRedirect[user.role] ?? '/admin', { replace: true })
+    }
+  }, [user, navigate])
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -29,11 +30,8 @@ export function LoginPage() {
     setLoading(true)
     try {
       await login(email, password)
-      const stored = JSON.parse(localStorage.getItem('user') ?? '{}')
-      navigate(roleRedirect[stored.role] ?? '/login', { replace: true })
     } catch {
       setError('Email ou senha inválidos.')
-    } finally {
       setLoading(false)
     }
   }
