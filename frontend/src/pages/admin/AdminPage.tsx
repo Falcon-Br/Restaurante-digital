@@ -5,9 +5,21 @@ import type { Item, Categoria, Mesa } from '../../api/types'
 
 type Tab = 'cardapio' | 'mesas'
 
+function extractError(err: unknown): string {
+  if (err && typeof err === 'object' && 'response' in err) {
+    const res = (err as { response?: { data?: { message?: string }; status?: number } }).response
+    if (res?.data?.message) return res.data.message
+    if (res?.status === 400) return 'Dados inválidos.'
+    if (res?.status === 401) return 'Não autorizado.'
+    if (res?.status === 500) return 'Erro interno no servidor.'
+  }
+  return 'Erro inesperado. Tente novamente.'
+}
+
 export function AdminPage() {
   const { logout } = useAuth()
   const [tab, setTab] = useState<Tab>('cardapio')
+  const [erro, setErro] = useState('')
 
   // Cardápio
   const [itens, setItens] = useState<Item[]>([])
@@ -31,8 +43,12 @@ export function AdminPage() {
   }
 
   const carregarMesas = async () => {
-    const { data } = await api.get<Mesa[]>('/mesas')
-    setMesas(data)
+    try {
+      const { data } = await api.get<Mesa[]>('/mesas')
+      setMesas(data)
+    } catch (err) {
+      setErro(extractError(err))
+    }
   }
 
   useEffect(() => {
@@ -44,69 +60,107 @@ export function AdminPage() {
   const salvarCategoria = async (e: React.FormEvent) => {
     e.preventDefault()
     setSalvandoCat(true)
-    if (editandoCat) {
-      await api.put(`/categorias/${editandoCat.id}`, { nome: novaCategoria, ordem: editandoCat.ordem })
-      setEditandoCat(null)
-    } else {
-      await api.post('/categorias', { nome: novaCategoria, ordem: categorias.length + 1 })
+    setErro('')
+    try {
+      if (editandoCat) {
+        await api.put(`/categorias/${editandoCat.id}`, { nome: novaCategoria, ordem: editandoCat.ordem })
+        setEditandoCat(null)
+      } else {
+        await api.post('/categorias', { nome: novaCategoria, ordem: categorias.length + 1 })
+      }
+      setNovaCategoria('')
+      await carregarCardapio()
+    } catch (err) {
+      setErro(extractError(err))
+    } finally {
+      setSalvandoCat(false)
     }
-    setNovaCategoria('')
-    await carregarCardapio()
-    setSalvandoCat(false)
   }
 
   const iniciarEdicaoCategoria = (cat: Categoria) => {
     setEditandoCat(cat)
     setNovaCategoria(cat.nome)
+    setErro('')
   }
 
   const excluirCategoria = async (id: number) => {
     if (!confirm('Excluir categoria? Os itens vinculados serão removidos.')) return
-    await api.delete(`/categorias/${id}`)
-    await carregarCardapio()
+    setErro('')
+    try {
+      await api.delete(`/categorias/${id}`)
+      await carregarCardapio()
+    } catch (err) {
+      setErro(extractError(err))
+    }
   }
 
   // --- Itens ---
   const criarItem = async (e: React.FormEvent) => {
     e.preventDefault()
     setSalvando(true)
-    await api.post('/itens', {
-      categoriaId: Number(form.categoriaId),
-      nome: form.nome,
-      descricao: form.descricao,
-      preco: parseFloat(form.preco.replace(',', '.')),
-      imagemUrl: null,
-    })
-    setForm(f => ({ ...f, nome: '', descricao: '', preco: '' }))
-    await carregarCardapio()
-    setSalvando(false)
+    setErro('')
+    try {
+      await api.post('/itens', {
+        categoriaId: Number(form.categoriaId),
+        nome: form.nome,
+        descricao: form.descricao,
+        preco: parseFloat(form.preco.replace(',', '.')),
+        imagemUrl: null,
+      })
+      setForm(f => ({ ...f, nome: '', descricao: '', preco: '' }))
+      await carregarCardapio()
+    } catch (err) {
+      setErro(extractError(err))
+    } finally {
+      setSalvando(false)
+    }
   }
 
   const toggleDisponivel = async (id: number) => {
-    await api.patch(`/itens/${id}/disponibilidade`)
-    setItens(prev => prev.map(i => i.id === id ? { ...i, disponivel: !i.disponivel } : i))
+    try {
+      await api.patch(`/itens/${id}/disponibilidade`)
+      setItens(prev => prev.map(i => i.id === id ? { ...i, disponivel: !i.disponivel } : i))
+    } catch (err) {
+      setErro(extractError(err))
+    }
   }
 
   const deletarItem = async (id: number) => {
     if (!confirm('Remover este item?')) return
-    await api.delete(`/itens/${id}`)
-    setItens(prev => prev.filter(i => i.id !== id))
+    setErro('')
+    try {
+      await api.delete(`/itens/${id}`)
+      setItens(prev => prev.filter(i => i.id !== id))
+    } catch (err) {
+      setErro(extractError(err))
+    }
   }
 
   // --- Mesas ---
   const criarMesa = async (e: React.FormEvent) => {
     e.preventDefault()
     setSalvandoMesa(true)
-    await api.post('/mesas', { numero: Number(novoNumeroMesa) })
-    setNovoNumeroMesa('')
-    await carregarMesas()
-    setSalvandoMesa(false)
+    setErro('')
+    try {
+      await api.post('/mesas', { numero: Number(novoNumeroMesa) })
+      setNovoNumeroMesa('')
+      await carregarMesas()
+    } catch (err) {
+      setErro(extractError(err))
+    } finally {
+      setSalvandoMesa(false)
+    }
   }
 
   const excluirMesa = async (id: number) => {
     if (!confirm('Excluir esta mesa?')) return
-    await api.delete(`/mesas/${id}`)
-    setMesas(prev => prev.filter(m => m.id !== id))
+    setErro('')
+    try {
+      await api.delete(`/mesas/${id}`)
+      setMesas(prev => prev.filter(m => m.id !== id))
+    } catch (err) {
+      setErro(extractError(err))
+    }
   }
 
   return (
@@ -119,25 +173,32 @@ export function AdminPage() {
       {/* Tabs */}
       <div className="flex border-b bg-white">
         <button
-          onClick={() => setTab('cardapio')}
+          onClick={() => { setTab('cardapio'); setErro('') }}
           className={`flex-1 py-3 text-sm font-semibold ${tab === 'cardapio' ? 'border-b-2 border-red-600 text-red-600' : 'text-gray-500'}`}
         >
           Cardápio
         </button>
         <button
-          onClick={() => setTab('mesas')}
+          onClick={() => { setTab('mesas'); setErro('') }}
           className={`flex-1 py-3 text-sm font-semibold ${tab === 'mesas' ? 'border-b-2 border-red-600 text-red-600' : 'text-gray-500'}`}
         >
           Mesas ({mesas.length})
         </button>
       </div>
 
+      {/* Banner de erro global */}
+      {erro && (
+        <div className="bg-red-50 border-l-4 border-red-500 text-red-700 px-4 py-3 mx-4 mt-4 rounded flex justify-between items-center">
+          <span className="text-sm">⚠️ {erro}</span>
+          <button onClick={() => setErro('')} className="text-red-500 font-bold ml-4">✕</button>
+        </div>
+      )}
+
       <div className="p-4 max-w-2xl mx-auto">
 
         {/* ---- ABA CARDÁPIO ---- */}
         {tab === 'cardapio' && (
           <>
-            {/* Categorias */}
             <div className="bg-white rounded-xl p-4 shadow-sm mb-4">
               <h2 className="font-bold mb-3">{editandoCat ? 'Editar categoria' : 'Nova categoria'}</h2>
               <form onSubmit={salvarCategoria} className="flex gap-2 mb-3">
@@ -154,9 +215,7 @@ export function AdminPage() {
                 </button>
                 {editandoCat && (
                   <button type="button" onClick={() => { setEditandoCat(null); setNovaCategoria('') }}
-                    className="px-3 rounded-lg border text-gray-500">
-                    ✕
-                  </button>
+                    className="px-3 rounded-lg border text-gray-500">✕</button>
                 )}
               </form>
               {categorias.length > 0 && (
@@ -166,13 +225,9 @@ export function AdminPage() {
                       <span className="text-sm font-medium">{c.nome}</span>
                       <div className="flex gap-2">
                         <button onClick={() => iniciarEdicaoCategoria(c)}
-                          className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 font-medium">
-                          Editar
-                        </button>
+                          className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 font-medium">Editar</button>
                         <button onClick={() => excluirCategoria(c.id)}
-                          className="text-xs px-2 py-1 rounded bg-red-100 text-red-700 font-medium">
-                          Excluir
-                        </button>
+                          className="text-xs px-2 py-1 rounded bg-red-100 text-red-700 font-medium">Excluir</button>
                       </div>
                     </div>
                   ))}
@@ -180,19 +235,15 @@ export function AdminPage() {
               )}
             </div>
 
-            {/* Adicionar item */}
             <div className="bg-white rounded-xl p-4 shadow-sm mb-6">
               <h2 className="font-bold mb-3">Adicionar item</h2>
               {categorias.length === 0 ? (
                 <p className="text-gray-400 text-sm">Crie uma categoria primeiro.</p>
               ) : (
                 <form onSubmit={criarItem} className="flex flex-col gap-3">
-                  <select
-                    value={form.categoriaId}
+                  <select value={form.categoriaId}
                     onChange={e => setForm(f => ({ ...f, categoriaId: e.target.value }))}
-                    className="border rounded-lg p-3"
-                    required
-                  >
+                    className="border rounded-lg p-3" required>
                     {categorias.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
                   </select>
                   <input placeholder="Nome" value={form.nome}
@@ -212,7 +263,6 @@ export function AdminPage() {
               )}
             </div>
 
-            {/* Lista de itens */}
             {categorias.map(cat => {
               const catItens = itens.filter(i => i.categoriaId === cat.id)
               if (catItens.length === 0) return null
@@ -222,22 +272,16 @@ export function AdminPage() {
                   {catItens.map(item => (
                     <div key={item.id} className="bg-white rounded-xl p-4 shadow-sm mb-2 flex justify-between items-center">
                       <div>
-                        <div className={`font-semibold ${!item.disponivel ? 'line-through text-gray-400' : ''}`}>
-                          {item.nome}
-                        </div>
+                        <div className={`font-semibold ${!item.disponivel ? 'line-through text-gray-400' : ''}`}>{item.nome}</div>
                         <div className="text-sm text-gray-500">R$ {item.preco.toFixed(2).replace('.', ',')}</div>
                       </div>
                       <div className="flex gap-2">
                         <button onClick={() => toggleDisponivel(item.id)}
-                          className={`text-xs px-3 py-1.5 rounded-lg font-medium ${
-                            item.disponivel ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
-                          }`}>
+                          className={`text-xs px-3 py-1.5 rounded-lg font-medium ${item.disponivel ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
                           {item.disponivel ? 'Disponível' : 'Esgotado'}
                         </button>
                         <button onClick={() => deletarItem(item.id)}
-                          className="text-xs px-3 py-1.5 rounded-lg bg-red-100 text-red-700 font-medium">
-                          Remover
-                        </button>
+                          className="text-xs px-3 py-1.5 rounded-lg bg-red-100 text-red-700 font-medium">Remover</button>
                       </div>
                     </div>
                   ))}
@@ -253,15 +297,9 @@ export function AdminPage() {
             <div className="bg-white rounded-xl p-4 shadow-sm mb-4">
               <h2 className="font-bold mb-3">Nova mesa</h2>
               <form onSubmit={criarMesa} className="flex gap-2">
-                <input
-                  type="number"
-                  placeholder="Número da mesa"
-                  value={novoNumeroMesa}
+                <input type="number" placeholder="Número da mesa" value={novoNumeroMesa}
                   onChange={e => setNovoNumeroMesa(e.target.value)}
-                  min={1}
-                  className="border rounded-lg p-3 flex-1"
-                  required
-                />
+                  min={1} className="border rounded-lg p-3 flex-1" required />
                 <button type="submit" disabled={salvandoMesa}
                   className="bg-red-600 text-white px-4 rounded-lg font-semibold disabled:opacity-50">
                   {salvandoMesa ? '...' : 'Criar'}
@@ -277,9 +315,7 @@ export function AdminPage() {
                     {m.status}
                   </div>
                   <button onClick={() => excluirMesa(m.id)}
-                    className="text-xs px-3 py-1 rounded-lg bg-red-100 text-red-700 font-medium w-full">
-                    Excluir
-                  </button>
+                    className="text-xs px-3 py-1 rounded-lg bg-red-100 text-red-700 font-medium w-full">Excluir</button>
                 </div>
               ))}
               {mesas.length === 0 && (

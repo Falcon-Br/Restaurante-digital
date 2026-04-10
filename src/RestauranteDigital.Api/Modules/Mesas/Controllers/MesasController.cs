@@ -21,9 +21,10 @@ public class MesasController(AppDbContext db, IConfiguration config) : Controlle
     {
         var mesas = await db.Mesas
             .OrderBy(m => m.Numero)
-            .Select(m => new MesaResponse(m.Id, m.Numero, m.QrCodeToken, m.Status, GetMenuUrl(m.QrCodeToken)))
             .ToListAsync();
-        return Ok(mesas);
+
+        return Ok(mesas.Select(m =>
+            new MesaResponse(m.Id, m.Numero, m.QrCodeToken, m.Status, GetMenuUrl(m.QrCodeToken))));
     }
 
     [HttpGet("token/{token}")]
