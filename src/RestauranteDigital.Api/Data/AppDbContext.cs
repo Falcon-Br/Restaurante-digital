@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using RestauranteDigital.Api.Modules.Auth.Models;
 using RestauranteDigital.Api.Modules.Cardapio.Models;
 using RestauranteDigital.Api.Modules.Mesas.Models;
+using RestauranteDigital.Api.Modules.Pedidos.Models;
 
 namespace RestauranteDigital.Api.Data;
 
@@ -13,6 +14,8 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<Categoria> Categorias => Set<Categoria>();
     public DbSet<Item> Itens => Set<Item>();
     public DbSet<Mesa> Mesas => Set<Mesa>();
+    public DbSet<Pedido> Pedidos => Set<Pedido>();
+    public DbSet<PedidoItem> PedidoItens => Set<PedidoItem>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -29,5 +32,9 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
         builder.Entity<Mesa>()
             .HasIndex(m => m.Numero)
             .IsUnique();
+
+        builder.Entity<Pedido>()
+            .Property(p => p.TotalFinal)
+            .HasPrecision(10, 2);
     }
 }
