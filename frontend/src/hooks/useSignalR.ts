@@ -11,6 +11,9 @@ type EventHandlers = {
 }
 
 export function useSignalR(handlers: EventHandlers) {
+  const handlersRef = useRef(handlers)
+  useEffect(() => { handlersRef.current = handlers })
+
   const connectionRef = useRef<signalR.HubConnection | null>(null)
 
   useEffect(() => {
@@ -21,18 +24,12 @@ export function useSignalR(handlers: EventHandlers) {
       .withAutomaticReconnect()
       .build()
 
-    if (handlers.onNovoPedido)
-      connection.on('NovoPedido', handlers.onNovoPedido)
-    if (handlers.onStatusAtualizado)
-      connection.on('StatusAtualizado', handlers.onStatusAtualizado)
-    if (handlers.onItemEsgotado)
-      connection.on('ItemEsgotado', handlers.onItemEsgotado)
-    if (handlers.onItemDisponivel)
-      connection.on('ItemDisponivel', handlers.onItemDisponivel)
-    if (handlers.onPedidoFechado)
-      connection.on('PedidoFechado', handlers.onPedidoFechado)
-    if (handlers.onPedidoCancelado)
-      connection.on('PedidoCancelado', handlers.onPedidoCancelado)
+    connection.on('NovoPedido', (...args: [number, number, string[]]) => handlersRef.current.onNovoPedido?.(...args))
+    connection.on('StatusAtualizado', (...args: [number, string]) => handlersRef.current.onStatusAtualizado?.(...args))
+    connection.on('ItemEsgotado', (...args: [number, string]) => handlersRef.current.onItemEsgotado?.(...args))
+    connection.on('ItemDisponivel', (...args: [number, string]) => handlersRef.current.onItemDisponivel?.(...args))
+    connection.on('PedidoFechado', (...args: [number]) => handlersRef.current.onPedidoFechado?.(...args))
+    connection.on('PedidoCancelado', (...args: [number]) => handlersRef.current.onPedidoCancelado?.(...args))
 
     connection.start().catch(console.error)
     connectionRef.current = connection

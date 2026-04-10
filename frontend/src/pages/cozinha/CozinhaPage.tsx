@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { api } from '../../api/client'
 import { useSignalR } from '../../hooks/useSignalR'
 import { useAuth } from '../../context/AuthContext'
@@ -15,14 +15,13 @@ export function CozinhaPage() {
   const [itens, setItens] = useState<KdsPedidoItem[]>([])
   const [tempoMedio, setTempoMedio] = useState(0)
   const [erro, setErro] = useState('')
-  const itensRef = useRef<KdsPedidoItem[]>([])
   const [modalEsgotado, setModalEsgotado] = useState<{ itemId: number; itemNome: string } | null>(null)
+  const [modalCancelarPedido, setModalCancelarPedido] = useState<number | null>(null)
 
   const carregarFila = useCallback(async () => {
     try {
       const { data } = await api.get<KdsFilaResponse>('/kds/fila')
       setItens(data.itens)
-      itensRef.current = data.itens
       setTempoMedio(data.tempoMedioMinutos)
     } catch {
       setErro('Erro ao carregar fila.')
@@ -127,7 +126,7 @@ export function CozinhaPage() {
                     Mesa {mesa} — Pedido #{pedidoId}
                   </span>
                   <button
-                    onClick={() => cancelarPedido(pedidoId)}
+                    onClick={() => setModalCancelarPedido(pedidoId)}
                     className="bg-red-700 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-red-800 font-semibold"
                   >
                     ✕ Cancelar pedido
@@ -164,6 +163,28 @@ export function CozinhaPage() {
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* Modal confirmação cancelar pedido */}
+      {modalCancelarPedido !== null && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-30 p-4">
+          <div className="bg-white text-black rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+            <h3 className="text-lg font-bold mb-2 text-center">Cancelar pedido completo?</h3>
+            <p className="text-sm text-gray-600 text-center mb-6">
+              Todos os itens deste pedido serão removidos.
+            </p>
+            <div className="flex flex-col gap-3">
+              <button onClick={() => { cancelarPedido(modalCancelarPedido); setModalCancelarPedido(null) }}
+                className="w-full bg-gray-800 text-white py-3 rounded-xl font-semibold hover:bg-gray-900">
+                Confirmar
+              </button>
+              <button onClick={() => setModalCancelarPedido(null)}
+                className="w-full border-2 border-gray-300 text-gray-600 py-3 rounded-xl font-semibold hover:bg-gray-50">
+                Cancelar
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
