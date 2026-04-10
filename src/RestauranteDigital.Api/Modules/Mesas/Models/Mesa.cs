@@ -4,8 +4,13 @@ public enum MesaStatus { Livre, Ocupada }
 
 public class Mesa
 {
+    public Mesa()
+    {
+        QrCodeToken = Guid.NewGuid().ToString();
+    }
+
     public int Id { get; set; }
     public int Numero { get; set; }
-    public string QrCodeToken { get; set; } = Guid.NewGuid().ToString();
+    public string QrCodeToken { get; set; }
     public MesaStatus Status { get; set; } = MesaStatus.Livre;
 }
