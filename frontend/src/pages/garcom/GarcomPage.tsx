@@ -24,6 +24,14 @@ export function GarcomPage() {
     onItemDisponivel: (itemId) => {
       setItens(prev => prev.map(i => i.id === itemId ? { ...i, disponivel: true } : i))
     },
+    onPedidoCancelado: (pedidoId) => {
+      setPedidos(prev => prev.filter(p => p.id !== pedidoId))
+      setMesas(prev => prev.map(m =>
+        m.id === mesaSelecionada?.id && pedidos.filter(p => p.id !== pedidoId).length === 0
+          ? { ...m, status: 0 }
+          : m
+      ))
+    },
   })
 
   const carregarMesas = async () => {

@@ -9,6 +9,7 @@ export interface Categoria {
   id: number
   nome: string
   ordem: number
+  cozinhar: boolean
 }
 
 export interface Item {

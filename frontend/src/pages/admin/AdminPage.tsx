@@ -28,6 +28,7 @@ export function AdminPage() {
   const [form, setForm] = useState({ nome: '', descricao: '', preco: '', categoriaId: '' })
   const [salvando, setSalvando] = useState(false)
   const [novaCategoria, setNovaCategoria] = useState('')
+  const [novaCatCozinhar, setNovaCatCozinhar] = useState(true)
   const [editandoCat, setEditandoCat] = useState<Categoria | null>(null)
   const [salvandoCat, setSalvandoCat] = useState(false)
 
@@ -73,12 +74,13 @@ export function AdminPage() {
     setErro('')
     try {
       if (editandoCat) {
-        await api.put(`/categorias/${editandoCat.id}`, { nome: novaCategoria, ordem: editandoCat.ordem })
+        await api.put(`/categorias/${editandoCat.id}`, { nome: novaCategoria, ordem: editandoCat.ordem, cozinhar: novaCatCozinhar })
         setEditandoCat(null)
       } else {
-        await api.post('/categorias', { nome: novaCategoria, ordem: categorias.length + 1 })
+        await api.post('/categorias', { nome: novaCategoria, ordem: categorias.length + 1, cozinhar: novaCatCozinhar })
       }
       setNovaCategoria('')
+      setNovaCatCozinhar(true)
       await carregarCardapio()
     } catch (err) {
       setErro(extractError(err))
@@ -90,6 +92,7 @@ export function AdminPage() {
   const iniciarEdicaoCategoria = (cat: Categoria) => {
     setEditandoCat(cat)
     setNovaCategoria(cat.nome)
+    setNovaCatCozinhar(cat.cozinhar)
     setErro('')
   }
 
@@ -211,22 +214,29 @@ export function AdminPage() {
           <>
             <div className="bg-white rounded-xl p-4 shadow-sm mb-4">
               <h2 className="font-bold mb-3">{editandoCat ? 'Editar categoria' : 'Nova categoria'}</h2>
-              <form onSubmit={salvarCategoria} className="flex gap-2 mb-3">
-                <input
-                  placeholder="Ex: Lanches, Bebidas..."
-                  value={novaCategoria}
-                  onChange={e => setNovaCategoria(e.target.value)}
-                  className="border rounded-lg p-3 flex-1"
-                  required
-                />
-                <button type="submit" disabled={salvandoCat}
-                  className="bg-red-600 text-white px-4 rounded-lg font-semibold disabled:opacity-50">
-                  {salvandoCat ? '...' : editandoCat ? 'Salvar' : 'Criar'}
-                </button>
-                {editandoCat && (
-                  <button type="button" onClick={() => { setEditandoCat(null); setNovaCategoria('') }}
-                    className="px-3 rounded-lg border text-gray-500">✕</button>
-                )}
+              <form onSubmit={salvarCategoria} className="mb-3">
+                <div className="flex gap-2 mb-2">
+                  <input
+                    placeholder="Ex: Lanches, Bebidas..."
+                    value={novaCategoria}
+                    onChange={e => setNovaCategoria(e.target.value)}
+                    className="border rounded-lg p-3 flex-1"
+                    required
+                  />
+                  <button type="submit" disabled={salvandoCat}
+                    className="bg-red-600 text-white px-4 rounded-lg font-semibold disabled:opacity-50">
+                    {salvandoCat ? '...' : editandoCat ? 'Salvar' : 'Criar'}
+                  </button>
+                  {editandoCat && (
+                    <button type="button" onClick={() => { setEditandoCat(null); setNovaCategoria(''); setNovaCatCozinhar(true) }}
+                      className="px-3 rounded-lg border text-gray-500">✕</button>
+                  )}
+                </div>
+                <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                  <input type="checkbox" checked={novaCatCozinhar} onChange={e => setNovaCatCozinhar(e.target.checked)}
+                    className="w-4 h-4 accent-red-600" />
+                  Precisa ser preparado na cozinha
+                </label>
               </form>
               {categorias.length > 0 && (
                 <div className="flex flex-col gap-2">

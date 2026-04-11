@@ -16,7 +16,7 @@ public class CategoriasController(AppDbContext db) : ControllerBase
     {
         var cats = await db.Categorias
             .OrderBy(c => c.Ordem)
-            .Select(c => new CategoriaResponse(c.Id, c.Nome, c.Ordem))
+            .Select(c => new CategoriaResponse(c.Id, c.Nome, c.Ordem, c.Cozinhar))
             .ToListAsync();
         return Ok(cats);
     }
@@ -25,10 +25,10 @@ public class CategoriasController(AppDbContext db) : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Create(CategoriaRequest request)
     {
-        var cat = new Categoria { Nome = request.Nome, Ordem = request.Ordem };
+        var cat = new Categoria { Nome = request.Nome, Ordem = request.Ordem, Cozinhar = request.Cozinhar };
         db.Categorias.Add(cat);
         await db.SaveChangesAsync();
-        return CreatedAtAction(nameof(GetAll), null, new CategoriaResponse(cat.Id, cat.Nome, cat.Ordem));
+        return CreatedAtAction(nameof(GetAll), null, new CategoriaResponse(cat.Id, cat.Nome, cat.Ordem, cat.Cozinhar));
     }
 
     [HttpPut("{id}")]
@@ -39,8 +39,9 @@ public class CategoriasController(AppDbContext db) : ControllerBase
         if (cat is null) return NotFound();
         cat.Nome = request.Nome;
         cat.Ordem = request.Ordem;
+        cat.Cozinhar = request.Cozinhar;
         await db.SaveChangesAsync();
-        return Ok(new CategoriaResponse(cat.Id, cat.Nome, cat.Ordem));
+        return Ok(new CategoriaResponse(cat.Id, cat.Nome, cat.Ordem, cat.Cozinhar));
     }
 
     [HttpDelete("{id}")]

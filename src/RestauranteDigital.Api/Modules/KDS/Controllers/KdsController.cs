@@ -19,8 +19,10 @@ public class KdsController(AppDbContext db, IHubContext<RestauranteHub> hub) : C
     {
         var itens = await db.PedidoItens
             .Include(pi => pi.Pedido).ThenInclude(p => p.Mesa)
-            .Include(pi => pi.Item)
-            .Where(pi => pi.Status != PedidoItemStatus.Pronto && pi.Pedido.Status == PedidoStatus.Aberto)
+            .Include(pi => pi.Item).ThenInclude(i => i.Categoria)
+            .Where(pi => pi.Status != PedidoItemStatus.Pronto
+                      && pi.Pedido.Status == PedidoStatus.Aberto
+                      && pi.Item.Categoria.Cozinhar)
             .OrderBy(pi => pi.CriadoEm)
             .ToListAsync();
 

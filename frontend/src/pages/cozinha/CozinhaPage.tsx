@@ -66,14 +66,6 @@ export function CozinhaPage() {
     }
   }
 
-  const cancelarItem = async (pedidoId: number, pedidoItemId: number) => {
-    try {
-      await api.delete(`/pedidos/${pedidoId}/itens/${pedidoItemId}`)
-      setItens(prev => prev.filter(i => i.pedidoItemId !== pedidoItemId))
-    } catch {
-      setErro('Erro ao cancelar item.')
-    }
-  }
 
   const cancelarPedido = async (pedidoId: number) => {
     try {
@@ -152,10 +144,6 @@ export function CozinhaPage() {
                       <button onClick={() => setModalEsgotado({ itemId: item.itemId, itemNome: item.itemNome })}
                         className="bg-gray-600 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-gray-700">
                         Esgotado
-                      </button>
-                      <button onClick={() => cancelarItem(item.pedidoId, item.pedidoItemId)}
-                        className="bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-red-700">
-                        ✕ Cancelar
                       </button>
                     </div>
                   </div>
