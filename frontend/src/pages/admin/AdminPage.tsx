@@ -128,8 +128,8 @@ export function AdminPage() {
 
   const toggleDisponivel = async (id: number) => {
     try {
-      await api.patch(`/itens/${id}/disponibilidade`)
-      setItens(prev => prev.map(i => i.id === id ? { ...i, disponivel: !i.disponivel } : i))
+      const { data } = await api.patch<Item>(`/itens/${id}/disponibilidade`)
+      setItens(prev => prev.map(i => i.id === id ? { ...i, disponivel: data.disponivel } : i))
     } catch (err) {
       setErro(extractError(err))
     }
