@@ -321,8 +321,8 @@ export function AdminPage() {
               {mesas.sort((a, b) => a.numero - b.numero).map(m => (
                 <div key={m.id} className="bg-white rounded-xl p-4 shadow-sm text-center">
                   <div className="text-2xl font-black mb-1">{m.numero}</div>
-                  <div className={`text-xs font-medium mb-3 ${m.status === 'Ocupada' ? 'text-orange-500' : 'text-green-600'}`}>
-                    {m.status}
+                  <div className={`text-xs font-medium mb-3 ${m.status === 1 ? 'text-orange-500' : 'text-green-600'}`}>
+                    {m.status === 1 ? 'Ocupada' : 'Livre'}
                   </div>
                   <button onClick={() => excluirMesa(m.id)}
                     className="text-xs px-3 py-1 rounded-lg bg-red-100 text-red-700 font-medium w-full">Excluir</button>

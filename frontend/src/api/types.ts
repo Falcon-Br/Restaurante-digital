@@ -26,7 +26,7 @@ export interface Mesa {
   id: number
   numero: number
   qrCodeToken: string
-  status: 'Livre' | 'Ocupada'
+  status: 0 | 1
   qrCodeUrl: string
 }
 

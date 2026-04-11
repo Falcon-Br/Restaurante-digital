@@ -120,11 +120,11 @@ export function GarcomPage() {
           {mesas.map(m => (
             <button key={m.id} onClick={() => selecionarMesa(m)}
               className={`p-6 rounded-xl text-center font-bold text-xl shadow ${
-                m.status === 'Ocupada' ? 'bg-orange-100 border-2 border-orange-400' : 'bg-white border border-gray-200'
+                m.status === 1 ? 'bg-orange-100 border-2 border-orange-400' : 'bg-white border border-gray-200'
               }`}
             >
               <div>{m.numero}</div>
-              <div className="text-xs font-normal mt-1 text-gray-500">{m.status}</div>
+              <div className="text-xs font-normal mt-1 text-gray-500">{m.status === 1 ? 'Ocupada' : 'Livre'}</div>
             </button>
           ))}
           {mesas.length === 0 && <p className="col-span-3 text-gray-400 text-sm text-center py-8">Nenhuma mesa cadastrada.</p>}
