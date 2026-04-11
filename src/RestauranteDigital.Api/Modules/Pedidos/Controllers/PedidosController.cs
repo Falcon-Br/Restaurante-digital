@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using RestauranteDigital.Api.Data;
 using RestauranteDigital.Api.Hubs;
 using RestauranteDigital.Api.Modules.Pedidos.DTOs;
+using RestauranteDigital.Api.Modules.Mesas.Models;
 using RestauranteDigital.Api.Modules.Pedidos.Models;
 
 namespace RestauranteDigital.Api.Modules.Pedidos.Controllers;
@@ -49,6 +50,7 @@ public class PedidosController(AppDbContext db, IHubContext<RestauranteHub> hub)
                 Observacao = req.Observacao
             });
         }
+        mesa.Status = MesaStatus.Ocupada;
         db.Pedidos.Add(pedido);
         await db.SaveChangesAsync();
 
@@ -76,6 +78,7 @@ public class PedidosController(AppDbContext db, IHubContext<RestauranteHub> hub)
 
         pedido.TotalFinal = pedido.Itens.Sum(i => i.Item.Preco * i.Quantidade);
         pedido.Status = PedidoStatus.Fechado;
+        await LiberarMesaSeVazia(pedido.MesaId, pedido.Id);
         await db.SaveChangesAsync();
 
         await hub.Clients.All.SendAsync("PedidoFechado", pedido.Id);
@@ -96,7 +99,10 @@ public class PedidosController(AppDbContext db, IHubContext<RestauranteHub> hub)
         if (pedidoItem is null) return NotFound();
 
         if (pedido.Itens.Count == 1)
+        {
+            await LiberarMesaSeVazia(pedido.MesaId, pedido.Id);
             db.Pedidos.Remove(pedido);  // EF cascade removes the single PedidoItem
+        }
         else
             db.PedidoItens.Remove(pedidoItem);
 
@@ -119,6 +125,7 @@ public class PedidosController(AppDbContext db, IHubContext<RestauranteHub> hub)
         if (pedido.Status == PedidoStatus.Fechado)
             return BadRequest(new { message = "Pedido já está fechado." });
 
+        await LiberarMesaSeVazia(pedido.MesaId, pedido.Id);
         db.PedidoItens.RemoveRange(pedido.Itens);
         db.Pedidos.Remove(pedido);
         await db.SaveChangesAsync();
@@ -126,6 +133,17 @@ public class PedidosController(AppDbContext db, IHubContext<RestauranteHub> hub)
         await hub.Clients.All.SendAsync("PedidoCancelado", id);
 
         return NoContent();
+    }
+
+    private async Task LiberarMesaSeVazia(int mesaId, int pedidoIdExcluido)
+    {
+        var temOutroPedidoAberto = await db.Pedidos
+            .AnyAsync(p => p.MesaId == mesaId && p.Id != pedidoIdExcluido && p.Status == PedidoStatus.Aberto);
+        if (!temOutroPedidoAberto)
+        {
+            var mesa = await db.Mesas.FindAsync(mesaId);
+            if (mesa is not null) mesa.Status = MesaStatus.Livre;
+        }
     }
 
     private static PedidoResponse ToResponse(Pedido p) => new(
