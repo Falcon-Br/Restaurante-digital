@@ -31,9 +31,11 @@ export function GerentePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="bg-red-600 text-white p-4 flex justify-between items-center">
-        <h1 className="text-xl font-bold">📊 Relatórios</h1>
-        <button onClick={logout} className="text-sm opacity-80">Sair</button>
+      <div className="bg-red-600 text-white p-4">
+        <div className="max-w-2xl mx-auto flex justify-between items-center">
+          <h1 className="text-xl font-bold">📊 Relatórios</h1>
+          <button onClick={logout} className="text-sm opacity-80">Sair</button>
+        </div>
       </div>
 
       <div className="p-4 max-w-2xl mx-auto">

@@ -4,7 +4,7 @@ namespace RestauranteDigital.Api.Modules.Pedidos.DTOs;
 
 public record PedidoItemRequest(int ItemId, int Quantidade, string? Observacao);
 
-public record CriarPedidoRequest(string MesaToken, List<PedidoItemRequest> Itens);
+public record CriarPedidoRequest(string MesaToken, int? ComandaId, List<PedidoItemRequest> Itens);
 
 public record PedidoItemResponse(
     int Id, int ItemId, string ItemNome, decimal ItemPreco,

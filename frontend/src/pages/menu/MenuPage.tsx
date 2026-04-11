@@ -118,7 +118,7 @@ export function MenuPage() {
         ))}
       </div>
 
-      <div className="p-3 flex flex-col gap-3">
+      <div className="p-3 flex flex-col gap-3 max-w-lg mx-auto">
         {itensFiltrados.map(item => (
           <div
             key={item.id}

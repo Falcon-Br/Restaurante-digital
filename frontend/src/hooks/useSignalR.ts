@@ -8,6 +8,7 @@ type EventHandlers = {
   onItemDisponivel?: (itemId: number, itemNome: string) => void
   onPedidoFechado?: (pedidoId: number) => void
   onPedidoCancelado?: (pedidoId: number) => void
+  onMesasAtualizadas?: () => void
 }
 
 export function useSignalR(handlers: EventHandlers) {
@@ -30,6 +31,7 @@ export function useSignalR(handlers: EventHandlers) {
     connection.on('ItemDisponivel', (...args: [number, string]) => handlersRef.current.onItemDisponivel?.(...args))
     connection.on('PedidoFechado', (...args: [number]) => handlersRef.current.onPedidoFechado?.(...args))
     connection.on('PedidoCancelado', (...args: [number]) => handlersRef.current.onPedidoCancelado?.(...args))
+    connection.on('MesasAtualizadas', () => handlersRef.current.onMesasAtualizadas?.())
 
     connection.start().catch(console.error)
     connectionRef.current = connection

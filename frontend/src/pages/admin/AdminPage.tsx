@@ -36,6 +36,8 @@ export function AdminPage() {
   const [mesas, setMesas] = useState<Mesa[]>([])
   const [novoNumeroMesa, setNovoNumeroMesa] = useState('')
   const [salvandoMesa, setSalvandoMesa] = useState(false)
+  const [modalExcluirCat, setModalExcluirCat] = useState<number | null>(null)
+  const [modalExcluirMesa, setModalExcluirMesa] = useState<number | null>(null)
 
   useSignalR({
     onItemEsgotado: (itemId) => {
@@ -44,6 +46,9 @@ export function AdminPage() {
     onItemDisponivel: (itemId) => {
       setItens(prev => prev.map(i => i.id === itemId ? { ...i, disponivel: true } : i))
     },
+    onNovoPedido: () => carregarMesas(),
+    onPedidoFechado: () => carregarMesas(),
+    onPedidoCancelado: () => carregarMesas(),
   })
 
   const carregarCardapio = async () => {
@@ -96,8 +101,14 @@ export function AdminPage() {
     setErro('')
   }
 
-  const excluirCategoria = async (id: number) => {
-    if (!confirm('Excluir categoria? Os itens vinculados serão removidos.')) return
+  const excluirCategoria = (id: number) => {
+    setModalExcluirCat(id)
+  }
+
+  const confirmarExcluirCategoria = async () => {
+    if (modalExcluirCat === null) return
+    const id = modalExcluirCat
+    setModalExcluirCat(null)
     setErro('')
     try {
       await api.delete(`/categorias/${id}`)
@@ -165,8 +176,19 @@ export function AdminPage() {
     }
   }
 
-  const excluirMesa = async (id: number) => {
-    if (!confirm('Excluir esta mesa?')) return
+  const excluirMesa = (id: number) => {
+    const mesa = mesas.find(m => m.id === id)
+    if (mesa?.status === 1) {
+      setErro(`Mesa ${mesa.numero} está ocupada e não pode ser excluída.`)
+      return
+    }
+    setModalExcluirMesa(id)
+  }
+
+  const confirmarExcluirMesa = async () => {
+    if (modalExcluirMesa === null) return
+    const id = modalExcluirMesa
+    setModalExcluirMesa(null)
     setErro('')
     try {
       await api.delete(`/mesas/${id}`)
@@ -178,9 +200,11 @@ export function AdminPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="bg-red-600 text-white p-4 flex justify-between items-center">
-        <h1 className="text-xl font-bold">⚙️ Admin</h1>
-        <button onClick={logout} className="text-sm opacity-80">Sair</button>
+      <div className="bg-red-600 text-white p-4">
+        <div className="max-w-2xl mx-auto flex justify-between items-center">
+          <h1 className="text-xl font-bold">⚙️ Admin</h1>
+          <button onClick={logout} className="text-sm opacity-80">Sair</button>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -345,6 +369,50 @@ export function AdminPage() {
           </>
         )}
       </div>
+
+      {/* Modal confirmação excluir mesa */}
+      {modalExcluirMesa !== null && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-30 p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+            <h3 className="text-lg font-bold mb-2 text-center">Excluir mesa?</h3>
+            <p className="text-sm text-gray-600 text-center mb-6">
+              Esta ação não pode ser desfeita.
+            </p>
+            <div className="flex flex-col gap-3">
+              <button onClick={confirmarExcluirMesa}
+                className="w-full bg-red-600 text-white py-3 rounded-xl font-semibold hover:bg-red-700">
+                Excluir
+              </button>
+              <button onClick={() => setModalExcluirMesa(null)}
+                className="w-full border-2 border-gray-300 text-gray-600 py-3 rounded-xl font-semibold hover:bg-gray-50">
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal confirmação excluir categoria */}
+      {modalExcluirCat !== null && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-30 p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+            <h3 className="text-lg font-bold mb-2 text-center">Excluir categoria?</h3>
+            <p className="text-sm text-gray-600 text-center mb-6">
+              Os itens vinculados a esta categoria também serão removidos.
+            </p>
+            <div className="flex flex-col gap-3">
+              <button onClick={confirmarExcluirCategoria}
+                className="w-full bg-red-600 text-white py-3 rounded-xl font-semibold hover:bg-red-700">
+                Excluir
+              </button>
+              <button onClick={() => setModalExcluirCat(null)}
+                className="w-full border-2 border-gray-300 text-gray-600 py-3 rounded-xl font-semibold hover:bg-gray-50">
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

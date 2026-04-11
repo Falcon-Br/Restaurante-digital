@@ -16,7 +16,6 @@ export function CozinhaPage() {
   const [tempoMedio, setTempoMedio] = useState(0)
   const [erro, setErro] = useState('')
   const [modalEsgotado, setModalEsgotado] = useState<{ itemId: number; itemNome: string } | null>(null)
-  const [modalCancelarPedido, setModalCancelarPedido] = useState<number | null>(null)
 
   const carregarFila = useCallback(async () => {
     try {
@@ -66,16 +65,6 @@ export function CozinhaPage() {
     }
   }
 
-
-  const cancelarPedido = async (pedidoId: number) => {
-    try {
-      await api.delete(`/pedidos/${pedidoId}`)
-      setItens(prev => prev.filter(i => i.pedidoId !== pedidoId))
-    } catch {
-      setErro('Erro ao cancelar pedido.')
-    }
-  }
-
   // Group items by pedidoId
   const grupos = itens.reduce<Record<number, KdsPedidoItem[]>>((acc, item) => {
     if (!acc[item.pedidoId]) acc[item.pedidoId] = []
@@ -85,14 +74,16 @@ export function CozinhaPage() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
-      <div className="flex items-center justify-between px-6 py-4 bg-gray-800">
-        <div>
-          <h1 className="text-2xl font-bold">🍳 Cozinha — KDS</h1>
-          {tempoMedio > 0 && (
-            <p className="text-sm text-gray-400">Tempo médio: ~{Math.round(tempoMedio)} min</p>
-          )}
+      <div className="bg-gray-800">
+        <div className="flex items-center justify-between px-6 py-4 max-w-screen-lg mx-auto">
+          <div>
+            <h1 className="text-2xl font-bold">🍳 Cozinha — KDS</h1>
+            {tempoMedio > 0 && (
+              <p className="text-sm text-gray-400">Tempo médio: ~{Math.round(tempoMedio)} min</p>
+            )}
+          </div>
+          <button onClick={logout} className="text-sm text-gray-400 hover:text-white">Sair</button>
         </div>
-        <button onClick={logout} className="text-sm text-gray-400 hover:text-white">Sair</button>
       </div>
 
       {erro && (
@@ -107,22 +98,16 @@ export function CozinhaPage() {
           <p className="text-gray-500 text-xl">Nenhum pedido na fila ✅</p>
         </div>
       ) : (
-        <div className="p-4 flex flex-col gap-6">
+        <div className="p-4 flex flex-col gap-6 max-w-screen-lg mx-auto">
           {Object.entries(grupos).map(([pedidoIdStr, pedidoItens]) => {
             const pedidoId = Number(pedidoIdStr)
             const mesa = pedidoItens[0].mesaNumero
             return (
               <div key={pedidoId} className="flex flex-col gap-2">
-                <div className="flex items-center justify-between px-1">
+                <div className="px-1">
                   <span className="text-gray-300 text-sm font-semibold uppercase tracking-wide">
                     Mesa {mesa} — Pedido #{pedidoId}
                   </span>
-                  <button
-                    onClick={() => setModalCancelarPedido(pedidoId)}
-                    className="bg-red-700 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-red-800 font-semibold"
-                  >
-                    ✕ Cancelar pedido
-                  </button>
                 </div>
                 {pedidoItens.map(item => (
                   <div key={item.pedidoItemId}
@@ -151,28 +136,6 @@ export function CozinhaPage() {
               </div>
             )
           })}
-        </div>
-      )}
-
-      {/* Modal confirmação cancelar pedido */}
-      {modalCancelarPedido !== null && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-30 p-4">
-          <div className="bg-white text-black rounded-2xl p-6 w-full max-w-sm shadow-2xl">
-            <h3 className="text-lg font-bold mb-2 text-center">Cancelar pedido completo?</h3>
-            <p className="text-sm text-gray-600 text-center mb-6">
-              Todos os itens deste pedido serão removidos.
-            </p>
-            <div className="flex flex-col gap-3">
-              <button onClick={() => { cancelarPedido(modalCancelarPedido); setModalCancelarPedido(null) }}
-                className="w-full bg-gray-800 text-white py-3 rounded-xl font-semibold hover:bg-gray-900">
-                Confirmar
-              </button>
-              <button onClick={() => setModalCancelarPedido(null)}
-                className="w-full border-2 border-gray-300 text-gray-600 py-3 rounded-xl font-semibold hover:bg-gray-50">
-                Cancelar
-              </button>
-            </div>
-          </div>
         </div>
       )}
 

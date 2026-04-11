@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using QRCoder;
 using RestauranteDigital.Api.Data;
+using RestauranteDigital.Api.Hubs;
 using RestauranteDigital.Api.Modules.Mesas.DTOs;
 using RestauranteDigital.Api.Modules.Mesas.Models;
 
@@ -10,7 +12,7 @@ namespace RestauranteDigital.Api.Modules.Mesas.Controllers;
 
 [ApiController]
 [Route("api/mesas")]
-public class MesasController(AppDbContext db, IConfiguration config) : ControllerBase
+public class MesasController(AppDbContext db, IConfiguration config, IHubContext<RestauranteHub> hub) : ControllerBase
 {
     private string GetMenuUrl(string token) =>
         $"{config["App:BaseUrl"] ?? "http://localhost:5173"}/menu/{token}";
@@ -60,6 +62,7 @@ public class MesasController(AppDbContext db, IConfiguration config) : Controlle
         var mesa = new Mesa { Numero = request.Numero };
         db.Mesas.Add(mesa);
         await db.SaveChangesAsync();
+        await hub.Clients.All.SendAsync("MesasAtualizadas");
 
         return CreatedAtAction(nameof(GetAll), null,
             new MesaResponse(mesa.Id, mesa.Numero, mesa.QrCodeToken, mesa.Status, GetMenuUrl(mesa.QrCodeToken)));
@@ -73,6 +76,7 @@ public class MesasController(AppDbContext db, IConfiguration config) : Controlle
         if (mesa is null) return NotFound();
         db.Mesas.Remove(mesa);
         await db.SaveChangesAsync();
+        await hub.Clients.All.SendAsync("MesasAtualizadas");
         return NoContent();
     }
 }

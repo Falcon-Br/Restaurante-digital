@@ -55,6 +55,18 @@ export interface Pedido {
   itens: PedidoItem[]
 }
 
+export type ComandaStatus = 0 | 1 // 0=Aberta, 1=Fechada
+
+export interface Comanda {
+  id: number
+  mesaId: number
+  nome: string
+  status: ComandaStatus
+  criadaEm: string
+  totalFinal: number | null
+  pedidos: Pedido[]
+}
+
 export interface KdsPedidoItem {
   pedidoItemId: number
   pedidoId: number

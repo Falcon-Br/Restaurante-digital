@@ -6,6 +6,7 @@ using RestauranteDigital.Api.Hubs;
 using RestauranteDigital.Api.Modules.Pedidos.DTOs;
 using RestauranteDigital.Api.Modules.Mesas.Models;
 using RestauranteDigital.Api.Modules.Pedidos.Models;
+using RestauranteDigital.Api.Modules.Mesas.DTOs;
 
 namespace RestauranteDigital.Api.Modules.Pedidos.Controllers;
 
@@ -40,7 +41,29 @@ public class PedidosController(AppDbContext db, IHubContext<RestauranteHub> hub)
         if (itensDb.Count != itemIds.Distinct().Count())
             return BadRequest(new { message = "Um ou mais itens não estão disponíveis." });
 
-        var pedido = new Pedido { MesaId = mesa.Id };
+        int comandaId;
+        if (request.ComandaId.HasValue)
+        {
+            var comandaExistente = await db.Comandas
+                .FirstOrDefaultAsync(c => c.Id == request.ComandaId.Value && c.MesaId == mesa.Id && c.Status == ComandaStatus.Aberta);
+            if (comandaExistente is null)
+                return BadRequest(new { message = "Comanda não encontrada ou já fechada." });
+            comandaId = comandaExistente.Id;
+        }
+        else
+        {
+            var comandaGeral = await db.Comandas
+                .FirstOrDefaultAsync(c => c.MesaId == mesa.Id && c.Status == ComandaStatus.Aberta);
+            if (comandaGeral is null)
+            {
+                comandaGeral = new Comanda { MesaId = mesa.Id, Nome = "Geral" };
+                db.Comandas.Add(comandaGeral);
+                await db.SaveChangesAsync();
+            }
+            comandaId = comandaGeral.Id;
+        }
+
+        var pedido = new Pedido { MesaId = mesa.Id, ComandaId = comandaId };
         foreach (var req in request.Itens)
         {
             pedido.Itens.Add(new PedidoItem

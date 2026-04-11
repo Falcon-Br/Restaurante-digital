@@ -9,6 +9,8 @@ public class Pedido
     public int Id { get; set; }
     public int MesaId { get; set; }
     public Mesa Mesa { get; set; } = null!;
+    public int? ComandaId { get; set; }
+    public Comanda? Comanda { get; set; }
     public string? GarcomId { get; set; }
     public PedidoStatus Status { get; set; } = PedidoStatus.Aberto;
     public DateTime CriadoEm { get; set; } = DateTime.UtcNow;

@@ -14,6 +14,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<Categoria> Categorias => Set<Categoria>();
     public DbSet<Item> Itens => Set<Item>();
     public DbSet<Mesa> Mesas => Set<Mesa>();
+    public DbSet<Comanda> Comandas => Set<Comanda>();
     public DbSet<Pedido> Pedidos => Set<Pedido>();
     public DbSet<PedidoItem> PedidoItens => Set<PedidoItem>();
 
@@ -35,6 +36,10 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
 
         builder.Entity<Pedido>()
             .Property(p => p.TotalFinal)
+            .HasPrecision(10, 2);
+
+        builder.Entity<Comanda>()
+            .Property(c => c.TotalFinal)
             .HasPrecision(10, 2);
     }
 }
