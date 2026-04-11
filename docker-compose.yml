@@ -8,8 +8,6 @@ services:
       POSTGRES_PASSWORD: restaurante123
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U restaurante -d restaurante_digital"]
       interval: 5s
@@ -29,8 +27,6 @@ services:
       App__BaseUrl: "http://localhost:8080"
       App__FrontendUrl: "http://localhost:3000"
       ASPNETCORE_ENVIRONMENT: "Production"
-    ports:
-      - "8080:8080"
     depends_on:
       db:
         condition: service_healthy
@@ -40,8 +36,6 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     restart: unless-stopped
-    ports:
-      - "3000:80"
     depends_on:
       - backend
 
