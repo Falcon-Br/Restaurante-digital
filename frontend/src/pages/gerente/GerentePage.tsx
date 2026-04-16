@@ -4,6 +4,52 @@ import { useAuth } from '../../context/AuthContext'
 import { useSignalR } from '../../hooks/useSignalR'
 import type { ResumoVendasResponse, PedidoResumo } from '../../api/types'
 
+function KpiCard({ label, value, sub, subColor, icon }: {
+  label: string
+  value: string
+  sub?: string
+  subColor?: string
+  icon: string
+}) {
+  const [hovered, setHovered] = useState(false)
+  return (
+    <div
+      className="relative p-8 rounded-xl flex flex-col gap-2 overflow-hidden transition-colors duration-300 cursor-default"
+      style={{
+        background: hovered ? '#b90014' : '#ffffff',
+        boxShadow: '0 24px 32px rgba(185,0,20,0.04)',
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <span className="text-[10px] font-bold uppercase tracking-[0.2em]"
+        style={{ color: hovered ? 'rgba(255,255,255,0.7)' : '#926e6b' }}>
+        {label}
+      </span>
+      <div className="flex items-baseline gap-2 flex-wrap">
+        <span className="text-4xl font-black tracking-tighter"
+          style={{ color: hovered ? '#ffffff' : '#191c20' }}>
+          {value}
+        </span>
+        {sub && (
+          <span className="font-bold text-sm"
+            style={{ color: hovered ? 'rgba(255,255,255,0.8)' : (subColor ?? '#428057') }}>
+            {sub}
+          </span>
+        )}
+      </div>
+      <span className="material-symbols-outlined absolute top-4 right-4 transition-opacity"
+        style={{
+          fontSize: '2.5rem',
+          color: hovered ? 'rgba(255,255,255,0.4)' : '#b90014',
+          opacity: hovered ? 0.4 : 0.1,
+        }}>
+        {icon}
+      </span>
+    </div>
+  )
+}
+
 export function GerentePage() {
   const { logout } = useAuth()
   const [resumo, setResumo] = useState<ResumoVendasResponse | null>(null)
@@ -24,105 +70,238 @@ export function GerentePage() {
   }
 
   useEffect(() => { carregar() }, [])
+  useSignalR({ onPedidoFechado: () => carregar() })
 
-  useSignalR({
-    onPedidoFechado: () => carregar(),
-  })
+  const inputStyle: React.CSSProperties = {
+    background: '#ffffff',
+    border: 'none',
+    borderRadius: '0.5rem',
+    padding: '0 1rem',
+    height: '3rem',
+    fontSize: '0.875rem',
+    color: '#191c20',
+    outline: 'none',
+    width: '100%',
+    fontWeight: 500,
+    boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-red-600 text-white p-4">
-        <div className="max-w-2xl mx-auto flex justify-between items-center">
-          <h1 className="text-xl font-bold">📊 Relatórios</h1>
-          <button onClick={logout} className="text-sm opacity-80">Sair</button>
-        </div>
-      </div>
+    <div className="min-h-screen flex overflow-hidden" style={{ background: '#f7f9ff', fontFamily: 'Inter, sans-serif', color: '#191c20' }}>
 
-      <div className="p-4 max-w-2xl mx-auto">
-        {/* Filtro de datas */}
-        <div className="bg-white rounded-xl p-4 shadow-sm mb-4 flex gap-3 items-end">
-          <div className="flex-1">
-            <label className="text-xs text-gray-500 block mb-1">De</label>
-            <input type="date" value={de} onChange={e => setDe(e.target.value)}
-              className="border rounded-lg p-2 w-full text-sm" />
+      {/* ── Sidebar ── */}
+      <aside className="hidden md:flex flex-col p-4 gap-2 h-screen sticky top-0 w-64 flex-shrink-0" style={{ background: '#f2f3f9' }}>
+        <div className="flex items-center gap-3 px-2 py-4 mb-6">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg"
+            style={{ background: '#b90014' }}>
+            <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>restaurant</span>
           </div>
-          <div className="flex-1">
-            <label className="text-xs text-gray-500 block mb-1">Até</label>
-            <input type="date" value={ate} onChange={e => setAte(e.target.value)}
-              className="border rounded-lg p-2 w-full text-sm" />
+          <div>
+            <h1 className="text-base font-black leading-tight" style={{ color: '#191c20' }}>Restaurante Digital</h1>
+            <p className="text-[10px] uppercase tracking-widest" style={{ color: '#926e6b' }}>Gerente</p>
           </div>
-          <button onClick={carregar} disabled={loading}
-            className="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold text-sm disabled:opacity-50">
-            {loading ? '...' : 'Filtrar'}
+        </div>
+
+        <nav className="flex-1 space-y-1">
+          <div className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold"
+            style={{ background: '#ffffff', color: '#b90014', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
+            <span className="material-symbols-outlined" style={{ fontSize: '1.25rem', fontVariationSettings: "'FILL' 1" }}>
+              analytics
+            </span>
+            <span>Relatórios</span>
+          </div>
+        </nav>
+
+        <div className="pt-4 space-y-1" style={{ borderTop: '1px solid #e6e8ee' }}>
+          <button onClick={logout}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium"
+            style={{ color: '#5d3f3c' }}>
+            <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>logout</span>
+            Sair
           </button>
         </div>
+      </aside>
 
-        {resumo && (
-          <>
-            {/* Cards de resumo */}
-            <div className="grid grid-cols-3 gap-3 mb-4">
-              <div className="bg-white rounded-xl p-4 shadow-sm text-center">
-                <div className="text-2xl font-black text-red-600">{resumo.totalPedidos}</div>
-                <div className="text-xs text-gray-500 mt-1">Pedidos</div>
+      {/* ── Main ── */}
+      <main className="flex-1 overflow-y-auto px-6 md:px-10 py-8 md:py-10">
+        <div className="max-w-5xl mx-auto">
+
+          {/* Page header */}
+          <header className="flex items-start justify-between mb-10">
+            <div>
+              <h2 className="text-3xl font-extrabold tracking-tight" style={{ color: '#191c20' }}>
+                Analytics & Reports
+              </h2>
+              <p className="font-medium mt-1" style={{ color: '#926e6b' }}>
+                Desempenho operacional da unidade.
+              </p>
+            </div>
+            {/* Mobile logout */}
+            <button onClick={logout} className="md:hidden flex items-center gap-1 text-sm font-medium"
+              style={{ color: '#5d3f3c' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>logout</span>
+            </button>
+          </header>
+
+          {/* Date filter */}
+          <section className="mb-10 p-6 rounded-xl flex flex-col md:flex-row items-end gap-4"
+            style={{ background: '#f2f3f9' }}>
+            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="flex flex-col gap-2">
+                <label className="text-[10px] font-bold uppercase tracking-widest"
+                  style={{ color: '#926e6b' }}>De:</label>
+                <input type="date" value={de} onChange={e => setDe(e.target.value)} style={inputStyle} />
               </div>
-              <div className="bg-white rounded-xl p-4 shadow-sm text-center">
-                <div className="text-xl font-black text-green-600">
-                  R$ {resumo.totalFaturado.toFixed(2).replace('.', ',')}
-                </div>
-                <div className="text-xs text-gray-500 mt-1">Faturado</div>
-              </div>
-              <div className="bg-white rounded-xl p-4 shadow-sm text-center">
-                <div className="text-2xl font-black text-blue-600">
-                  {resumo.tempoMedioMinutos > 0 ? `${resumo.tempoMedioMinutos}min` : '—'}
-                </div>
-                <div className="text-xs text-gray-500 mt-1">Tempo médio</div>
+              <div className="flex flex-col gap-2">
+                <label className="text-[10px] font-bold uppercase tracking-widest"
+                  style={{ color: '#926e6b' }}>Até:</label>
+                <input type="date" value={ate} onChange={e => setAte(e.target.value)} style={inputStyle} />
               </div>
             </div>
+            <button onClick={carregar} disabled={loading}
+              className="font-bold text-white px-8 rounded-lg transition-all active:scale-95 disabled:opacity-50 flex-shrink-0"
+              style={{ background: 'linear-gradient(135deg, #b90014, #e31b23)', height: '3rem', minWidth: '7rem' }}>
+              {loading ? '...' : 'Filtrar'}
+            </button>
+          </section>
 
-            {/* Itens mais vendidos */}
-            {resumo.itensMaisVendidos.length > 0 && (
-              <div className="bg-white rounded-xl p-4 shadow-sm mb-4">
-                <h2 className="font-bold mb-3">🏆 Itens mais vendidos</h2>
-                {resumo.itensMaisVendidos.map((item, i) => (
-                  <div key={item.itemId} className="flex justify-between items-center py-2 border-b last:border-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-gray-400 text-sm w-5">{i + 1}.</span>
-                      <span className="font-medium">{item.itemNome}</span>
+          {resumo && (
+            <>
+              {/* KPI cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-10">
+                <KpiCard
+                  label="Total Pedidos"
+                  value={String(resumo.totalPedidos)}
+                  icon="shopping_cart"
+                />
+                <KpiCard
+                  label="Faturamento"
+                  value={`R$ ${resumo.totalFaturado.toFixed(2).replace('.', ',')}`}
+                  icon="payments"
+                />
+                <KpiCard
+                  label="Tempo Médio"
+                  value={resumo.tempoMedioMinutos > 0 ? `${resumo.tempoMedioMinutos}min` : '—'}
+                  icon="timer"
+                />
+              </div>
+
+              {/* Secondary grid */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+                {/* Itens mais vendidos */}
+                <section className="rounded-2xl p-8" style={{ background: '#f2f3f9' }}>
+                  <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-xl font-bold tracking-tight">Itens mais vendidos</h3>
+                  </div>
+                  {resumo.itensMaisVendidos.length === 0 ? (
+                    <p className="text-sm py-4 text-center" style={{ color: '#926e6b' }}>
+                      Sem dados no período.
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {resumo.itensMaisVendidos.map((item, i) => (
+                        <div key={item.itemId}
+                          className="flex items-center justify-between p-4 rounded-xl transition-colors"
+                          style={{ background: '#ffffff' }}>
+                          <div className="flex items-center gap-4">
+                            <div className="w-11 h-11 rounded-lg flex items-center justify-center font-bold flex-shrink-0"
+                              style={{ background: '#f7f9ff', color: '#b90014' }}>
+                              {String(i + 1).padStart(2, '0')}
+                            </div>
+                            <div>
+                              <p className="font-bold" style={{ color: '#191c20' }}>{item.itemNome}</p>
+                            </div>
+                          </div>
+                          <div className="text-right flex-shrink-0 ml-4">
+                            <p className="font-bold" style={{ color: '#191c20' }}>
+                              {item.quantidadeTotal} un.
+                            </p>
+                            <p className="text-xs font-bold" style={{ color: '#428057' }}>
+                              R$ {item.totalGerado.toFixed(2).replace('.', ',')}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                    <div className="text-right">
-                      <div className="font-bold text-sm">{item.quantidadeTotal}x</div>
-                      <div className="text-xs text-gray-500">
-                        R$ {item.totalGerado.toFixed(2).replace('.', ',')}
+                  )}
+                </section>
+
+                {/* Pedidos fechados */}
+                <section className="rounded-2xl p-8" style={{ background: '#f2f3f9' }}>
+                  <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-xl font-bold tracking-tight">Pedidos fechados</h3>
+                    <span className="text-xs font-bold uppercase tracking-widest" style={{ color: '#926e6b' }}>
+                      {pedidos.length} no período
+                    </span>
+                  </div>
+
+                  {pedidos.length === 0 ? (
+                    <p className="text-sm py-4 text-center" style={{ color: '#926e6b' }}>
+                      Nenhum pedido no período.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {/* Table header */}
+                      <div className="grid grid-cols-4 px-4 py-2 text-[10px] font-black uppercase tracking-widest"
+                        style={{ color: '#926e6b' }}>
+                        <span>Mesa</span>
+                        <span>Pedido</span>
+                        <span>Horário</span>
+                        <span className="text-right">Total</span>
                       </div>
+                      {/* Rows */}
+                      {pedidos.map(p => (
+                        <div key={p.id}
+                          className="grid grid-cols-4 px-4 py-4 rounded-xl items-center transition-shadow"
+                          style={{ background: '#ffffff' }}>
+                          <span className="font-bold" style={{ color: '#b90014' }}>
+                            Mesa {p.mesaNumero}
+                          </span>
+                          <span className="text-sm font-medium" style={{ color: '#191c20' }}>
+                            #{p.id}
+                          </span>
+                          <span className="text-xs" style={{ color: '#926e6b' }}>
+                            {new Date(p.criadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                          <span className="text-right font-bold" style={{ color: '#191c20' }}>
+                            R$ {(p.totalFinal ?? 0).toFixed(2).replace('.', ',')}
+                          </span>
+                        </div>
+                      ))}
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  )}
 
-            {/* Histórico de pedidos */}
-            <div className="bg-white rounded-xl p-4 shadow-sm">
-              <h2 className="font-bold mb-3">📋 Pedidos fechados ({pedidos.length})</h2>
-              {pedidos.length === 0 && (
-                <p className="text-gray-400 text-sm text-center py-4">Nenhum pedido no período</p>
-              )}
-              {pedidos.map(p => (
-                <div key={p.id} className="flex justify-between items-center py-2 border-b last:border-0">
-                  <div>
-                    <div className="font-medium">Mesa {p.mesaNumero} — Pedido #{p.id}</div>
-                    <div className="text-xs text-gray-500">
-                      {new Date(p.criadoEm).toLocaleString('pt-BR')} · {p.numeroItens} itens
+                  {/* CTA banner */}
+                  <div className="mt-6 h-32 w-full rounded-xl overflow-hidden relative"
+                    style={{ background: 'linear-gradient(135deg, #b90014 0%, #7f0010 100%)' }}>
+                    <span className="material-symbols-outlined absolute right-4 bottom-[-12px] opacity-20"
+                      style={{ fontSize: '8rem', color: '#ffffff', transform: 'rotate(-12deg)' }}>
+                      description
+                    </span>
+                    <div className="absolute inset-0 flex flex-col justify-center p-6">
+                      <span className="text-white text-xs font-bold uppercase tracking-widest opacity-80">
+                        Relatório Completo
+                      </span>
+                      <span className="text-white text-lg font-black mt-1">
+                        {resumo.totalPedidos} pedidos · R$ {resumo.totalFaturado.toFixed(2).replace('.', ',')}
+                      </span>
                     </div>
                   </div>
-                  <div className="font-bold text-green-700">
-                    R$ {(p.totalFinal ?? 0).toFixed(2).replace('.', ',')}
-                  </div>
-                </div>
-              ))}
+                </section>
+
+              </div>
+            </>
+          )}
+
+          {!resumo && loading && (
+            <div className="flex items-center justify-center py-24" style={{ color: '#926e6b' }}>
+              <span className="material-symbols-outlined animate-spin mr-2">progress_activity</span>
+              Carregando...
             </div>
-          </>
-        )}
-      </div>
+          )}
+        </div>
+      </main>
     </div>
   )
 }

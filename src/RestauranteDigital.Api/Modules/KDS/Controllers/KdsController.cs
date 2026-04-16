@@ -15,6 +15,7 @@ namespace RestauranteDigital.Api.Modules.KDS.Controllers;
 public class KdsController(AppDbContext db, IHubContext<RestauranteHub> hub) : ControllerBase
 {
     [HttpGet("fila")]
+    [AllowAnonymous]
     public async Task<IActionResult> GetFila()
     {
         var itens = await db.PedidoItens
