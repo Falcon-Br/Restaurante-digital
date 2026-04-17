@@ -20,7 +20,7 @@ public class PedidosController(AppDbContext db, IHubContext<RestauranteHub> hub)
     {
         var query = db.Pedidos
             .Include(p => p.Mesa)
-            .Include(p => p.Itens).ThenInclude(i => i.Item)
+            .Include(p => p.Itens).ThenInclude(i => i.Item).ThenInclude(i => i.Categoria)
             .AsQueryable();
 
         if (mesaId.HasValue) query = query.Where(p => p.MesaId == mesaId.Value);
@@ -109,6 +109,21 @@ public class PedidosController(AppDbContext db, IHubContext<RestauranteHub> hub)
         return Ok(ToResponse(pedido));
     }
 
+    [HttpPatch("itens/{pedidoItemId}/entregue")]
+    [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Garcom,Admin")]
+    public async Task<IActionResult> MarcarEntregue(int pedidoItemId)
+    {
+        var pi = await db.PedidoItens.FirstOrDefaultAsync(x => x.Id == pedidoItemId);
+        if (pi is null) return NotFound();
+
+        pi.Status = PedidoItemStatus.Entregue;
+        await db.SaveChangesAsync();
+
+        await hub.Clients.All.SendAsync("StatusAtualizado", pi.Id, PedidoItemStatus.Entregue.ToString());
+
+        return NoContent();
+    }
+
     [HttpDelete("{pedidoId}/itens/{itemId}")]
     [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Cozinha")]
     public async Task<IActionResult> CancelarItem(int pedidoId, int itemId)
@@ -173,5 +188,6 @@ public class PedidosController(AppDbContext db, IHubContext<RestauranteHub> hub)
         p.Id, p.MesaId, p.Mesa.Numero, p.Status, p.CriadoEm, p.TotalFinal,
         p.Itens.Select(i => new PedidoItemResponse(
             i.Id, i.ItemId, i.Item.Nome, i.Item.Preco,
-            i.Quantidade, i.Observacao, i.Status, i.CriadoEm)).ToList());
+            i.Quantidade, i.Observacao, i.Status, i.CriadoEm,
+            i.Item.Categoria?.Cozinhar ?? true)).ToList());
 }

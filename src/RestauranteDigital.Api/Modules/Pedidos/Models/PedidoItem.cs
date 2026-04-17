@@ -2,7 +2,7 @@ using RestauranteDigital.Api.Modules.Cardapio.Models;
 
 namespace RestauranteDigital.Api.Modules.Pedidos.Models;
 
-public enum PedidoItemStatus { Pendente, EmPreparo, Pronto }
+public enum PedidoItemStatus { Pendente, EmPreparo, Pronto, Entregue }
 
 public class PedidoItem
 {

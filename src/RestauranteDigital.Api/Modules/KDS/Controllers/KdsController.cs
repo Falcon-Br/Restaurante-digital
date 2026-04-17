@@ -22,6 +22,7 @@ public class KdsController(AppDbContext db, IHubContext<RestauranteHub> hub) : C
             .Include(pi => pi.Pedido).ThenInclude(p => p.Mesa)
             .Include(pi => pi.Item).ThenInclude(i => i.Categoria)
             .Where(pi => pi.Status != PedidoItemStatus.Pronto
+                      && pi.Status != PedidoItemStatus.Entregue
                       && pi.Pedido.Status == PedidoStatus.Aberto
                       && pi.Item.Categoria.Cozinhar)
             .OrderBy(pi => pi.CriadoEm)

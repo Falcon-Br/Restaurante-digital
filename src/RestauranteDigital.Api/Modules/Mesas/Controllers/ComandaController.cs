@@ -20,7 +20,7 @@ public class ComandaController(AppDbContext db, IHubContext<RestauranteHub> hub)
     {
         var query = db.Comandas
             .Include(c => c.Pedidos).ThenInclude(p => p.Mesa)
-            .Include(c => c.Pedidos).ThenInclude(p => p.Itens).ThenInclude(i => i.Item)
+            .Include(c => c.Pedidos).ThenInclude(p => p.Itens).ThenInclude(i => i.Item).ThenInclude(i => i.Categoria)
             .Where(c => c.MesaId == mesaId);
 
         if (status == "Aberta")
@@ -48,7 +48,7 @@ public class ComandaController(AppDbContext db, IHubContext<RestauranteHub> hub)
     {
         var comanda = await db.Comandas
             .Include(c => c.Pedidos).ThenInclude(p => p.Mesa)
-            .Include(c => c.Pedidos).ThenInclude(p => p.Itens).ThenInclude(i => i.Item)
+            .Include(c => c.Pedidos).ThenInclude(p => p.Itens).ThenInclude(i => i.Item).ThenInclude(i => i.Categoria)
             .FirstOrDefaultAsync(c => c.Id == id);
 
         if (comanda is null) return NotFound();
@@ -89,6 +89,7 @@ public class ComandaController(AppDbContext db, IHubContext<RestauranteHub> hub)
             p.Id, p.MesaId, p.Mesa?.Numero ?? 0, p.Status, p.CriadoEm, p.TotalFinal,
             p.Itens.Select(i => new PedidoItemResponse(
                 i.Id, i.ItemId, i.Item?.Nome ?? "", i.Item?.Preco ?? 0,
-                i.Quantidade, i.Observacao, i.Status, i.CriadoEm)).ToList()
+                i.Quantidade, i.Observacao, i.Status, i.CriadoEm,
+                i.Item?.Categoria?.Cozinhar ?? true)).ToList()
         )).ToList());
 }

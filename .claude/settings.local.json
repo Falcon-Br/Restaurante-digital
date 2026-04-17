@@ -32,7 +32,12 @@
       "Bash(curl -L \"https://lh3.googleusercontent.com/aida/ADBb0ug8B6J9l_Y38vwJ3cVbtkWBJHdVB8tZ4Jmtx2s3EFBQEcXFrcbvwLsabsgdjnCv_TgB76fKgArSxWMM1RPptObNSycYWZpZ4rC-j6zoeWttwpkMb8RRQDa33Acj9vEYWr5YJNuwl2gYcDzbMNwgMOb-ap1t_SlY9UQRazo07I5wCQSepxQMyytH3VdT_7DyCWE68MPc5VTIK9hT3H2BtipXxq8IENKdBY9jEepAetXf5o_tLoLv3mE8RKk\" -o /tmp/stitch_screenshot.png)",
       "Bash(curl -L \"https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ7Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpaCiVodG1sXzBkZjE4YmJiM2I2MDRhZDk5Zjg4MTUxNmQ1MDIyM2VkEgsSBxCInv7hshYYAZIBIwoKcHJvamVjdF9pZBIVQhM5ODM0MjQ0MzA4MTI2OTczMTgx&filename=&opi=89354086\" -o \"stitch_screen.html\")",
       "Bash(curl -L \"https://lh3.googleusercontent.com/aida/ADBb0ug8B6J9l_Y38vwJ3cVbtkWBJHdVB8tZ4Jmtx2s3EFBQEcXFrcbvwLsabsgdjnCv_TgB76fKgArSxWMM1RPptObNSycYWZpZ4rC-j6zoeWttwpkMb8RRQDa33Acj9vEYWr5YJNuwl2gYcDzbMNwgMOb-ap1t_SlY9UQRazo07I5wCQSepxQMyytH3VdT_7DyCWE68MPc5VTIK9hT3H2BtipXxq8IENKdBY9jEepAetXf5o_tLoLv3mE8RKk\" -o \"stitch_screenshot.png\")",
-      "Bash(xargs grep:*)"
+      "Bash(xargs grep:*)",
+      "Bash(npm test:*)",
+      "Bash(curl -L \"https://lh3.googleusercontent.com/aida/ADBb0ujHiWhe6Ak3ElauSsKuvL824UA2cvfW0W5ahGcooJO_y5J-AYZ12lL8GIGiW9WxBkFAAGFMMUemqYOA533Oqeuh7qmcaLibn2wBzYd1dlY7AAKMWAySddsWXZ0jMxEWUtTEHQT92kT-mC4efzkJcLQTQqv-x6Wkr7ZDHTS7Hy06sk6c5rIWTWEAl3H-wb4UXpqgPLy9PS6J_cYllXijTReQLQBVn2GOmooWj23fHRfFKDsw3WCC5RkVCsQ\" -o \"D:/Projetos Pessoais/Restaurante digital/frontend/public/icon-1024.png\" --silent)",
+      "Bash(python3 -c ':*)",
+      "Bash(python3:*)",
+      "Bash(node -e ':*)"
     ]
   }
 }

@@ -8,7 +8,8 @@ public record CriarPedidoRequest(string MesaToken, int? ComandaId, List<PedidoIt
 
 public record PedidoItemResponse(
     int Id, int ItemId, string ItemNome, decimal ItemPreco,
-    int Quantidade, string? Observacao, PedidoItemStatus Status, DateTime CriadoEm);
+    int Quantidade, string? Observacao, PedidoItemStatus Status, DateTime CriadoEm,
+    bool Cozinhar);
 
 public record PedidoResponse(
     int Id, int MesaId, int MesaNumero, PedidoStatus Status,
