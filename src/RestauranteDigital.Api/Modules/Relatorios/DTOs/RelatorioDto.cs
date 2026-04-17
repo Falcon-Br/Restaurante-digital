@@ -21,3 +21,11 @@ public record PedidoResumo(
     decimal? TotalFinal,
     string Status,
     int NumeroItens);
+
+public record ComandaResumo(
+    int Id,
+    int MesaId,
+    int MesaNumero,
+    string Nome,
+    DateTime CriadaEm,
+    decimal? TotalFinal);

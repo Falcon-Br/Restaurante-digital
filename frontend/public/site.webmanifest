@@ -1,0 +1,11 @@
+{
+  "name": "Restaurante Digital",
+  "short_name": "Restaurante",
+  "icons": [
+    { "src": "/icon-1024.png", "sizes": "512x512", "type": "image/jpeg" },
+    { "src": "/icon-1024.png", "sizes": "1024x1024", "type": "image/jpeg" }
+  ],
+  "theme_color": "#b90014",
+  "background_color": "#f7f9ff",
+  "display": "standalone"
+}

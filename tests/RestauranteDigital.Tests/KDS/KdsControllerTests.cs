@@ -36,7 +36,7 @@ public class KdsControllerTests : TestBase
         Client.DefaultRequestHeaders.Authorization = null;
 
         var pedidoResp = await Client.PostAsJsonAsync("/api/pedidos",
-            new CriarPedidoRequest(mesa!.QrCodeToken, [new PedidoItemRequest(item!.Id, 1, null)]));
+            new CriarPedidoRequest(mesa!.QrCodeToken, null, [new PedidoItemRequest(item!.Id, 1, null)]));
         var pedido = await pedidoResp.Content.ReadFromJsonAsync<PedidoResponse>();
         return pedido!.Itens[0].Id;
     }
@@ -77,9 +77,10 @@ public class KdsControllerTests : TestBase
     }
 
     [Fact]
-    public async Task GetFila_SemAutenticacao_Returns401()
+    public async Task GetFila_SemAutenticacao_Returns200()
     {
+        // /api/kds/fila tem [AllowAnonymous] — tela da cozinha não requer login
         var response = await Client.GetAsync("/api/kds/fila");
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 }

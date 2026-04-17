@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RestauranteDigital.Api.Data;
+using RestauranteDigital.Api.Modules.Mesas.Models;
 using RestauranteDigital.Api.Modules.Pedidos.Models;
 using RestauranteDigital.Api.Modules.Relatorios.DTOs;
 
@@ -81,5 +82,27 @@ public class RelatoriosController(AppDbContext db) : ControllerBase
             .ToListAsync();
 
         return Ok(pedidos);
+    }
+
+    [HttpGet("comandas")]
+    public async Task<IActionResult> GetComandas(
+        [FromQuery] DateTime? de,
+        [FromQuery] DateTime? ate)
+    {
+        var dataInicio = de?.ToUniversalTime() ?? DateTime.UtcNow.AddDays(-7);
+        var dataFim = (ate?.ToUniversalTime() ?? DateTime.UtcNow).AddDays(1);
+
+        var comandas = await db.Comandas
+            .Include(c => c.Mesa)
+            .Where(c => c.Status == ComandaStatus.Fechada
+                     && c.CriadaEm >= dataInicio
+                     && c.CriadaEm < dataFim)
+            .OrderByDescending(c => c.CriadaEm)
+            .Take(200)
+            .Select(c => new ComandaResumo(
+                c.Id, c.MesaId, c.Mesa.Numero, c.Nome, c.CriadaEm, c.TotalFinal))
+            .ToListAsync();
+
+        return Ok(comandas);
     }
 }

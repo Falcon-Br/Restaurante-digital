@@ -31,7 +31,7 @@ export interface Mesa {
   qrCodeUrl: string
 }
 
-export type PedidoItemStatus = 'Pendente' | 'EmPreparo' | 'Pronto'
+export type PedidoItemStatus = 'Pendente' | 'EmPreparo' | 'Pronto' | 'Entregue'
 export type PedidoStatus = 'Aberto' | 'Fechado'
 
 export interface PedidoItem {
@@ -43,6 +43,7 @@ export interface PedidoItem {
   observacao: string | null
   status: PedidoItemStatus
   criadoEm: string
+  cozinhar: boolean
 }
 
 export interface Pedido {
@@ -108,4 +109,13 @@ export interface PedidoResumo {
   totalFinal: number | null
   status: string
   numeroItens: number
+}
+
+export interface ComandaResumo {
+  id: number
+  mesaId: number
+  mesaNumero: number
+  nome: string
+  criadaEm: string
+  totalFinal: number | null
 }

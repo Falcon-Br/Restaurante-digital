@@ -46,7 +46,7 @@ public class PedidosControllerTests : TestBase
         var (mesaToken, itemId) = await SeedData(token);
 
         var response = await Client.PostAsJsonAsync("/api/pedidos", new CriarPedidoRequest(
-            mesaToken, [new PedidoItemRequest(itemId, 2, "Sem cebola")]));
+            mesaToken, null, [new PedidoItemRequest(itemId, 2, "Sem cebola")]));
 
         response.StatusCode.Should().Be(HttpStatusCode.Created);
         var pedido = await response.Content.ReadFromJsonAsync<PedidoResponse>();
@@ -58,7 +58,7 @@ public class PedidosControllerTests : TestBase
     public async Task CriarPedido_TokenMesaInvalido_Returns404()
     {
         var response = await Client.PostAsJsonAsync("/api/pedidos",
-            new CriarPedidoRequest("token-invalido", [new PedidoItemRequest(1, 1, null)]));
+            new CriarPedidoRequest("token-invalido", null, [new PedidoItemRequest(1, 1, null)]));
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
@@ -69,7 +69,7 @@ public class PedidosControllerTests : TestBase
         var (mesaToken, itemId) = await SeedData(adminToken);
 
         await Client.PostAsJsonAsync("/api/pedidos",
-            new CriarPedidoRequest(mesaToken, [new PedidoItemRequest(itemId, 1, null)]));
+            new CriarPedidoRequest(mesaToken, null, [new PedidoItemRequest(itemId, 1, null)]));
 
         await Client.PostAsJsonAsync("/api/auth/register",
             new RegisterRequest("Garcom", "garcom@test.com", "senha123", "Garcom"));
@@ -103,7 +103,7 @@ public class PedidosControllerTests : TestBase
         var (mesaToken, itemId) = await SeedData(adminToken);
         Client.DefaultRequestHeaders.Authorization = null;
         var resp = await Client.PostAsJsonAsync("/api/pedidos",
-            new CriarPedidoRequest(mesaToken, [new PedidoItemRequest(itemId, 1, null)]));
+            new CriarPedidoRequest(mesaToken, null, [new PedidoItemRequest(itemId, 1, null)]));
         return (await resp.Content.ReadFromJsonAsync<PedidoResponse>())!;
     }
 
