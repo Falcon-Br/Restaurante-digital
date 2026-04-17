@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import { useAuth } from '../context/AuthContext'
 
 const roleRedirect: Record<string, string> = {
@@ -16,7 +17,6 @@ export function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -27,12 +27,11 @@ export function LoginPage() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    setError('')
     setLoading(true)
     try {
       await login(email, password)
     } catch {
-      setError('Email ou senha inválidos.')
+      toast.error('Email ou senha inválidos.')
       setLoading(false)
     }
   }
@@ -282,12 +281,6 @@ export function LoginPage() {
                 </button>
               </div>
             </div>
-
-            {error && (
-              <p className="text-sm text-center font-medium" style={{ color: '#ba1a1a' }}>
-                {error}
-              </p>
-            )}
 
             {/* Submit */}
             <button

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 import { api } from '../../api/client'
 import { useAuth } from '../../context/AuthContext'
 import { useSignalR } from '../../hooks/useSignalR'
@@ -100,27 +101,37 @@ export function GarcomPage() {
   const enviarPedido = async (comandaId: number) => {
     if (!mesaSelecionada || cart.length === 0) return
     setModalSelecionarComanda(false)
-    await api.post('/pedidos', {
-      mesaToken: mesaSelecionada.qrCodeToken,
-      comandaId,
-      itens: cart.map(c => ({ itemId: c.itemId, quantidade: c.quantidade, observacao: c.observacao || null })),
-    })
-    setCart([])
-    setMostrarCart(false)
-    await carregarComandas(mesaSelecionada.id)
-    await carregarMesas()
+    try {
+      await api.post('/pedidos', {
+        mesaToken: mesaSelecionada.qrCodeToken,
+        comandaId,
+        itens: cart.map(c => ({ itemId: c.itemId, quantidade: c.quantidade, observacao: c.observacao || null })),
+      })
+      setCart([])
+      setMostrarCart(false)
+      toast.success('Pedido enviado para a cozinha!')
+      await carregarComandas(mesaSelecionada.id)
+      await carregarMesas()
+    } catch {
+      toast.error('Erro ao enviar pedido.')
+    }
   }
 
   const enviarSemComanda = async () => {
     if (!mesaSelecionada || cart.length === 0) return
-    await api.post('/pedidos', {
-      mesaToken: mesaSelecionada.qrCodeToken,
-      itens: cart.map(c => ({ itemId: c.itemId, quantidade: c.quantidade, observacao: c.observacao || null })),
-    })
-    setCart([])
-    setMostrarCart(false)
-    await carregarComandas(mesaSelecionada.id)
-    await carregarMesas()
+    try {
+      await api.post('/pedidos', {
+        mesaToken: mesaSelecionada.qrCodeToken,
+        itens: cart.map(c => ({ itemId: c.itemId, quantidade: c.quantidade, observacao: c.observacao || null })),
+      })
+      setCart([])
+      setMostrarCart(false)
+      toast.success('Pedido enviado para a cozinha!')
+      await carregarComandas(mesaSelecionada.id)
+      await carregarMesas()
+    } catch {
+      toast.error('Erro ao enviar pedido.')
+    }
   }
 
   const handleEnviarClick = () => {
@@ -138,15 +149,25 @@ export function GarcomPage() {
   const criarComanda = async () => {
     if (!mesaSelecionada || !nomeComanda.trim()) return
     setModalNomeComanda(false)
-    await api.post(`/mesas/${mesaSelecionada.id}/comandas`, { nome: nomeComanda.trim() })
-    await carregarComandas(mesaSelecionada.id)
-    setNomeComanda('')
+    try {
+      await api.post(`/mesas/${mesaSelecionada.id}/comandas`, { nome: nomeComanda.trim() })
+      setNomeComanda('')
+      toast.success('Comanda criada!')
+      await carregarComandas(mesaSelecionada.id)
+    } catch {
+      toast.error('Erro ao criar comanda.')
+    }
   }
 
   const fecharComanda = async (comandaId: number) => {
-    await api.post(`/comandas/${comandaId}/fechar`)
-    if (mesaSelecionada) await carregarComandas(mesaSelecionada.id)
-    await carregarMesas()
+    try {
+      await api.post(`/comandas/${comandaId}/fechar`)
+      toast.success('Comanda fechada!')
+      if (mesaSelecionada) await carregarComandas(mesaSelecionada.id)
+      await carregarMesas()
+    } catch {
+      toast.error('Erro ao fechar comanda.')
+    }
   }
 
   const itensFiltrados = catFiltro !== null
@@ -426,12 +447,13 @@ export function GarcomPage() {
                       boxShadow: '0 1px 4px rgba(0,0,0,0.07)',
                       opacity: item.disponivel ? 1 : 0.45,
                     }}>
-                    {/* Image placeholder */}
-                    <div className="h-28 w-full flex items-center justify-center relative"
+                    {/* Image / icon */}
+                    <div className="h-28 w-full flex items-center justify-center relative overflow-hidden"
                       style={{ background: gradient }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: '3rem', color: iconColor, opacity: 0.6 }}>
-                        {icon}
-                      </span>
+                      {item.imagemUrl
+                        ? <img src={item.imagemUrl} alt={item.nome} className="w-full h-full object-cover" />
+                        : <span className="material-symbols-outlined" style={{ fontSize: '3rem', color: iconColor, opacity: 0.6 }}>{icon}</span>
+                      }
                       {!item.disponivel && (
                         <div className="absolute inset-0 flex items-center justify-center"
                           style={{ background: 'rgba(0,0,0,0.35)' }}>

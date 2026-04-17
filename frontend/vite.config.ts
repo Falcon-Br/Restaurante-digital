@@ -10,4 +10,9 @@ export default defineConfig({
       '/hubs': { target: 'http://localhost:5000', ws: true },
     },
   },
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: ['./src/test/setup.ts'],
+  },
 })

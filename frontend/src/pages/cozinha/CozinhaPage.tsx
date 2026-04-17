@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { toast } from 'sonner'
 import { api } from '../../api/client'
 import { useSignalR } from '../../hooks/useSignalR'
 import { useAuth } from '../../context/AuthContext'
@@ -28,7 +29,6 @@ export function CozinhaPage() {
   const { logout } = useAuth()
   const [itens, setItens] = useState<KdsPedidoItem[]>([])
   const [tempoMedio, setTempoMedio] = useState(0)
-  const [erro, setErro] = useState('')
   const [modalEsgotado, setModalEsgotado] = useState<{ itemId: number; itemNome: string } | null>(null)
 
   const carregarFila = useCallback(async () => {
@@ -37,7 +37,7 @@ export function CozinhaPage() {
       setItens(data.itens)
       setTempoMedio(data.tempoMedioMinutos)
     } catch {
-      setErro('Erro ao carregar fila.')
+      toast.error('Erro ao carregar fila.')
     }
   }, [])
 
@@ -62,20 +62,22 @@ export function CozinhaPage() {
     try {
       await api.patch(`/kds/${pedidoItemId}/status`, { novoStatus: 2 })
       setItens(prev => prev.filter(i => i.pedidoItemId !== pedidoItemId))
+      toast.success('Item marcado como pronto!')
     } catch {
-      setErro('Erro ao marcar como pronto.')
+      toast.error('Erro ao marcar como pronto.')
     }
   }
 
   const confirmarEsgotado = async () => {
     if (!modalEsgotado) return
-    const { itemId } = modalEsgotado
+    const { itemId, itemNome } = modalEsgotado
     setModalEsgotado(null)
     try {
       await api.patch(`/kds/${itemId}/esgotado`, {})
       setItens(prev => prev.filter(i => i.itemId !== itemId))
+      toast.success(`${itemNome} marcado como esgotado.`)
     } catch {
-      setErro('Erro ao marcar como esgotado.')
+      toast.error('Erro ao marcar como esgotado.')
     }
   }
 
@@ -169,18 +171,6 @@ export function CozinhaPage() {
             </button>
           </div>
         </header>
-
-        {/* Error banner */}
-        {erro && (
-          <div className="flex justify-between items-center px-6 py-3 text-sm font-medium"
-            style={{ background: '#fef2f2', color: '#b90014', borderBottom: '1px solid #fecaca' }}>
-            <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>error</span>
-              {erro}
-            </div>
-            <button onClick={() => setErro('')} className="font-bold ml-4">✕</button>
-          </div>
-        )}
 
         {/* Content */}
         <main className="flex-1 overflow-y-auto px-6 md:px-8 pt-8 pb-24">
