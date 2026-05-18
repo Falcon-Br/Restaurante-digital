@@ -31,6 +31,14 @@ export interface Mesa {
   qrCodeUrl: string
 }
 
+export interface MesaPublicQr {
+  numero: number
+  qrCodeToken: string
+  qrCodeUrl: string
+  qrCodeImageUrl: string
+  qrPageUrl: string
+}
+
 export type PedidoItemStatus = 'Pendente' | 'EmPreparo' | 'Pronto' | 'Entregue'
 export type PedidoStatus = 'Aberto' | 'Fechado'
 

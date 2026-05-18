@@ -4,3 +4,4 @@ namespace RestauranteDigital.Api.Modules.Mesas.DTOs;
 
 public record MesaRequest(int Numero);
 public record MesaResponse(int Id, int Numero, string QrCodeToken, MesaStatus Status, string QrCodeUrl);
+public record MesaPublicQrResponse(int Numero, string QrCodeToken, string QrCodeUrl, string QrCodeImageUrl, string QrPageUrl);

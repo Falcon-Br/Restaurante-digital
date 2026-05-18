@@ -1,10 +1,32 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { api } from '../../api/client'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../context/useAuth'
 import { useSignalR } from '../../hooks/useSignalR'
+import { formatCurrencyBRL } from '../../utils/currency'
 import type { ResumoVendasResponse, PedidoResumo, ComandaResumo } from '../../api/types'
 
 type Aba = 'relatorios' | 'comandas'
+
+function formatDateInput(date: Date) {
+  return date.toISOString().split('T')[0]
+}
+
+function formatUpdatedAt(timestamp: number | null, now = Date.now()) {
+  if (!timestamp) return 'Ainda nao atualizado'
+  const seconds = Math.max(0, Math.floor((now - timestamp) / 1000))
+  if (seconds < 5) return 'Atualizado agora'
+  if (seconds < 60) return `Atualizado ha ${seconds}s`
+  return `Atualizado ha ${Math.floor(seconds / 60)}min`
+}
+
+function normalizeSearch(value: string) {
+  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+}
+
+function csvCell(value: string | number | null | undefined) {
+  const text = String(value ?? '')
+  return `"${text.replace(/"/g, '""')}"`
+}
 
 function KpiCard({ label, value, sub, subColor, icon }: {
   label: string
@@ -61,21 +83,34 @@ export function GerentePage() {
   const [de, setDe] = useState(() => new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0])
   const [ate, setAte] = useState(() => new Date().toISOString().split('T')[0])
   const [loading, setLoading] = useState(false)
+  const [atualizadoEm, setAtualizadoEm] = useState<number | null>(null)
+  const [agora, setAgora] = useState(Date.now())
+  const [buscaComanda, setBuscaComanda] = useState('')
 
-  const carregar = async () => {
+  const carregar = useCallback(async () => {
     setLoading(true)
-    const [r, p, c] = await Promise.all([
-      api.get<ResumoVendasResponse>(`/relatorios/resumo?de=${de}&ate=${ate}`),
-      api.get<PedidoResumo[]>(`/relatorios/pedidos?status=Fechado&de=${de}&ate=${ate}`),
-      api.get<ComandaResumo[]>(`/relatorios/comandas?de=${de}&ate=${ate}`),
-    ])
-    setResumo(r.data)
-    setPedidos(p.data)
-    setComandas(c.data)
-    setLoading(false)
-  }
+    try {
+      const [r, p, c] = await Promise.all([
+        api.get<ResumoVendasResponse>(`/relatorios/resumo?de=${de}&ate=${ate}`),
+        api.get<PedidoResumo[]>(`/relatorios/pedidos?status=Fechado&de=${de}&ate=${ate}`),
+        api.get<ComandaResumo[]>(`/relatorios/comandas?de=${de}&ate=${ate}`),
+      ])
+      setResumo(r.data)
+      setPedidos(p.data)
+      setComandas(c.data)
+      const timestamp = Date.now()
+      setAtualizadoEm(timestamp)
+      setAgora(timestamp)
+    } finally {
+      setLoading(false)
+    }
+  }, [ate, de])
 
-  useEffect(() => { carregar() }, [])
+  useEffect(() => { void Promise.resolve().then(carregar) }, [carregar])
+  useEffect(() => {
+    const timer = window.setInterval(() => setAgora(Date.now()), 10000)
+    return () => window.clearInterval(timer)
+  }, [])
   useSignalR({ onPedidoFechado: () => carregar() })
 
   const inputStyle: React.CSSProperties = {
@@ -90,6 +125,63 @@ export function GerentePage() {
     width: '100%',
     fontWeight: 500,
     boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+  }
+
+  const ticketMedio = resumo && resumo.totalPedidos > 0
+    ? resumo.totalFaturado / resumo.totalPedidos
+    : 0
+  const itemLider = resumo?.itensMaisVendidos[0]
+  const periodoLabel = `${new Date(`${de}T00:00:00`).toLocaleDateString('pt-BR')} - ${new Date(`${ate}T00:00:00`).toLocaleDateString('pt-BR')}`
+  const termoComanda = normalizeSearch(buscaComanda)
+  const comandasFiltradas = comandas.filter(c => {
+    if (!termoComanda) return true
+    const mesa = String(c.mesaNumero)
+    const mesaComZero = mesa.padStart(2, '0')
+    const termoMesa = termoComanda.replace(/^0+(?=\d)/, '')
+    return normalizeSearch(c.nome).includes(termoComanda)
+      || mesa.includes(termoMesa)
+      || mesaComZero.includes(termoComanda)
+      || String(c.id).includes(termoComanda)
+  })
+
+  const setPeriodoRapido = (dias: number) => {
+    const fim = new Date()
+    const inicio = new Date()
+    inicio.setDate(fim.getDate() - (dias - 1))
+    setDe(formatDateInput(inicio))
+    setAte(formatDateInput(fim))
+  }
+
+  const exportarCsv = (tipo: 'pedidos' | 'comandas') => {
+    const rows = tipo === 'pedidos'
+      ? [
+          ['Pedido', 'Mesa', 'Criado em', 'Itens', 'Total'],
+          ...pedidos.map(p => [
+            p.id,
+            p.mesaNumero,
+            new Date(p.criadoEm).toLocaleString('pt-BR'),
+            p.numeroItens,
+            (p.totalFinal ?? 0).toFixed(2).replace('.', ','),
+          ]),
+        ]
+      : [
+          ['Comanda', 'Mesa', 'Nome', 'Criada em', 'Total'],
+          ...comandasFiltradas.map(c => [
+            c.id,
+            c.mesaNumero,
+            c.nome,
+            new Date(c.criadaEm).toLocaleString('pt-BR'),
+            (c.totalFinal ?? 0).toFixed(2).replace('.', ','),
+          ]),
+        ]
+    const csv = rows.map(row => row.map(csvCell).join(';')).join('\n')
+    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `gerente-${tipo}-${de}-${ate}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
   }
 
   const navItem = (id: Aba, icon: string, label: string) => {
@@ -155,12 +247,22 @@ export function GerentePage() {
               <p className="font-medium mt-1" style={{ color: '#926e6b' }}>
                 {aba === 'relatorios' ? 'Desempenho operacional da unidade.' : 'Comandas fechadas no período selecionado.'}
               </p>
+              <p className="mt-2 text-xs font-bold uppercase tracking-widest" style={{ color: loading ? '#b90014' : '#926e6b' }}>
+                {loading ? 'Atualizando dados...' : formatUpdatedAt(atualizadoEm, agora)}
+              </p>
             </div>
-            {/* Mobile logout */}
+            <div className="flex items-center gap-2">
+              <button onClick={carregar} disabled={loading}
+                className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold transition-all active:scale-95 disabled:opacity-60"
+                style={{ background: '#ffffff', color: '#5d3f3c', border: '1px solid #e6e8ee' }}>
+                <span className={`material-symbols-outlined ${loading ? 'animate-spin' : ''}`} style={{ fontSize: '1rem' }}>refresh</span>
+                <span className="hidden sm:inline">Atualizar</span>
+              </button>
             <button onClick={logout} className="md:hidden flex items-center gap-1 text-sm font-medium"
               style={{ color: '#5d3f3c' }}>
               <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>logout</span>
             </button>
+            </div>
           </header>
 
           {/* Mobile tab bar */}
@@ -185,7 +287,21 @@ export function GerentePage() {
           {/* Date filter */}
           <section className="mb-10 p-6 rounded-xl flex flex-col md:flex-row items-end gap-4"
             style={{ background: '#f2f3f9' }}>
-            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="flex-1 space-y-4">
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { label: 'Hoje', dias: 1 },
+                  { label: '7 dias', dias: 7 },
+                  { label: '30 dias', dias: 30 },
+                ].map(shortcut => (
+                  <button key={shortcut.label} type="button" onClick={() => setPeriodoRapido(shortcut.dias)}
+                    className="filter-pill rounded-full px-4 py-2 text-xs font-black uppercase tracking-widest"
+                    style={{ background: '#ffffff', color: '#5d3f3c', border: '1px solid #e6e8ee' }}>
+                    {shortcut.label}
+                  </button>
+                ))}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="flex flex-col gap-2">
                 <label className="text-[10px] font-bold uppercase tracking-widest"
                   style={{ color: '#926e6b' }}>De:</label>
@@ -196,22 +312,71 @@ export function GerentePage() {
                   style={{ color: '#926e6b' }}>Até:</label>
                 <input type="date" value={ate} onChange={e => setAte(e.target.value)} style={inputStyle} />
               </div>
+              </div>
             </div>
             <button onClick={carregar} disabled={loading}
               className="font-bold text-white px-8 rounded-lg transition-all active:scale-95 disabled:opacity-50 flex-shrink-0"
               style={{ background: 'linear-gradient(135deg, #b90014, #e31b23)', height: '3rem', minWidth: '7rem' }}>
-              {loading ? '...' : 'Filtrar'}
+              {loading ? 'Filtrando...' : 'Filtrar'}
             </button>
           </section>
 
           {/* ── Aba: Relatórios ── */}
           {aba === 'relatorios' && resumo && (
-            <>
+            <div key="relatorios" className="tab-panel">
+              <section className="mb-6 grid grid-cols-1 gap-3 rounded-2xl p-5 md:grid-cols-4"
+                style={{ background: '#ffffff', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#926e6b' }}>Periodo</p>
+                  <p className="mt-1 text-sm font-black" style={{ color: '#191c20' }}>{periodoLabel}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#926e6b' }}>Pedidos fechados</p>
+                  <p className="mt-1 text-sm font-black" style={{ color: '#191c20' }}>{resumo.totalPedidos} pedidos</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#926e6b' }}>Faturamento</p>
+                  <p className="mt-1 text-sm font-black" style={{ color: '#b90014' }}>{formatCurrencyBRL(resumo.totalFaturado)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#926e6b' }}>Ticket medio</p>
+                  <p className="mt-1 text-sm font-black" style={{ color: '#428057' }}>{formatCurrencyBRL(ticketMedio)}</p>
+                </div>
+              </section>
+
               {/* KPI cards */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-10">
                 <KpiCard label="Total Pedidos" value={String(resumo.totalPedidos)} icon="shopping_cart" />
-                <KpiCard label="Faturamento" value={`R$ ${resumo.totalFaturado.toFixed(2).replace('.', ',')}`} icon="payments" />
+                <KpiCard label="Faturamento" value={formatCurrencyBRL(resumo.totalFaturado)} icon="payments" />
                 <KpiCard label="Tempo Médio" value={resumo.tempoMedioMinutos > 0 ? `${resumo.tempoMedioMinutos}min` : '—'} icon="timer" />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10 motion-list">
+                <div className="rounded-xl p-5" style={{ background: '#ffffff', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                  <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#926e6b' }}>Ticket médio</p>
+                  <p className="mt-2 text-2xl font-black" style={{ color: '#191c20' }}>
+                    {formatCurrencyBRL(ticketMedio)}
+                  </p>
+                  <p className="mt-1 text-xs font-semibold" style={{ color: '#428057' }}>Receita média por pedido fechado</p>
+                </div>
+                <div className="rounded-xl p-5" style={{ background: '#ffffff', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                  <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#926e6b' }}>Produto líder</p>
+                  <p className="mt-2 truncate text-2xl font-black" style={{ color: '#191c20' }}>
+                    {itemLider ? `Líder: ${itemLider.itemNome}` : 'Sem vendas'}
+                  </p>
+                  <p className="mt-1 text-xs font-semibold" style={{ color: '#b90014' }}>
+                    {itemLider ? `${itemLider.quantidadeTotal} unidades no período` : 'Aguardando movimentação'}
+                  </p>
+                </div>
+                <div className="rounded-xl p-5" style={{ background: '#ffffff', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                  <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#926e6b' }}>Ritmo</p>
+                  <p className="mt-2 text-2xl font-black" style={{ color: '#191c20' }}>
+                    {resumo.totalPedidos > 0 ? 'Ativo' : 'Sem movimento'}
+                  </p>
+                  <p className="mt-1 text-xs font-semibold" style={{ color: resumo.totalPedidos > 0 ? '#428057' : '#926e6b' }}>
+                    {resumo.totalPedidos > 0 ? 'Período com pedidos fechados' : 'Ajuste o filtro ou aguarde pedidos'}
+                  </p>
+                </div>
               </div>
 
               {/* Secondary grid */}
@@ -240,7 +405,7 @@ export function GerentePage() {
                           <div className="text-right flex-shrink-0 ml-4">
                             <p className="font-bold" style={{ color: '#191c20' }}>{item.quantidadeTotal} un.</p>
                             <p className="text-xs font-bold" style={{ color: '#428057' }}>
-                              R$ {item.totalGerado.toFixed(2).replace('.', ',')}
+                              {formatCurrencyBRL(item.totalGerado)}
                             </p>
                           </div>
                         </div>
@@ -253,13 +418,29 @@ export function GerentePage() {
                 <section className="rounded-2xl p-8 flex flex-col" style={{ background: '#f2f3f9' }}>
                   <div className="flex justify-between items-center mb-6">
                     <h3 className="text-xl font-bold tracking-tight">Pedidos fechados</h3>
-                    <span className="text-xs font-bold uppercase tracking-widest" style={{ color: '#926e6b' }}>
-                      {pedidos.length} no período
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold uppercase tracking-widest" style={{ color: '#926e6b' }}>
+                        {pedidos.length} no periodo
+                      </span>
+                      {pedidos.length > 0 && (
+                        <button onClick={() => exportarCsv('pedidos')}
+                          className="rounded-lg px-3 py-2 text-xs font-black uppercase tracking-widest"
+                          style={{ background: '#ffffff', color: '#5d3f3c', border: '1px solid #e6e8ee' }}>
+                          CSV
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {pedidos.length === 0 ? (
-                    <p className="text-sm py-4 text-center" style={{ color: '#926e6b' }}>Nenhum pedido no período.</p>
+                    <div className="py-6 text-center">
+                      <p className="text-sm" style={{ color: '#926e6b' }}>Nenhum pedido no periodo.</p>
+                      <button onClick={() => setPeriodoRapido(7)}
+                        className="mt-3 rounded-xl px-4 py-2 text-sm font-bold text-white"
+                        style={{ background: '#b90014' }}>
+                        Ver ultimos 7 dias
+                      </button>
+                    </div>
                   ) : (
                     <>
                       <div className="grid grid-cols-4 px-4 py-2 text-[10px] font-black uppercase tracking-widest flex-shrink-0"
@@ -277,7 +458,7 @@ export function GerentePage() {
                               {new Date(p.criadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                             </span>
                             <span className="text-right font-bold" style={{ color: '#191c20' }}>
-                              R$ {(p.totalFinal ?? 0).toFixed(2).replace('.', ',')}
+                              {formatCurrencyBRL(p.totalFinal ?? 0)}
                             </span>
                           </div>
                         ))}
@@ -295,30 +476,77 @@ export function GerentePage() {
                     <div className="absolute inset-0 flex flex-col justify-center p-6">
                       <span className="text-white text-xs font-bold uppercase tracking-widest opacity-80">Relatório Completo</span>
                       <span className="text-white text-lg font-black mt-1">
-                        {resumo.totalPedidos} pedidos · R$ {resumo.totalFaturado.toFixed(2).replace('.', ',')}
+                        {resumo.totalPedidos} pedidos - {formatCurrencyBRL(resumo.totalFaturado)}
                       </span>
                     </div>
                   </div>
                 </section>
 
               </div>
-            </>
+            </div>
           )}
 
           {/* ── Aba: Comandas ── */}
           {aba === 'comandas' && (
-            <section className="flex-1 flex flex-col rounded-2xl p-8 min-h-0" style={{ background: '#f2f3f9' }}>
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-bold tracking-tight">Comandas fechadas</h3>
-                <span className="text-xs font-bold uppercase tracking-widest" style={{ color: '#926e6b' }}>
-                  {comandas.length} no período
-                </span>
+            <section key="comandas" className="tab-panel flex-1 flex flex-col rounded-2xl p-8 min-h-0" style={{ background: '#f2f3f9' }}>
+              <div className="flex flex-col gap-4 mb-6 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <h3 className="text-xl font-bold tracking-tight">Comandas fechadas</h3>
+                  <p className="mt-1 text-xs font-bold uppercase tracking-widest" style={{ color: '#926e6b' }}>
+                    {buscaComanda.trim() ? `${comandasFiltradas.length} de ${comandas.length}` : `${comandas.length} no período`}
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <label className="flex items-center gap-3 rounded-xl px-4 py-2"
+                    style={{ background: '#ffffff', border: '1px solid #e6e8ee' }}>
+                    <span className="material-symbols-outlined" style={{ color: '#926e6b', fontSize: '1.1rem' }}>search</span>
+                    <input
+                      value={buscaComanda}
+                      onChange={e => setBuscaComanda(e.target.value)}
+                      placeholder="Buscar mesa ou nome"
+                      className="w-48 bg-transparent text-sm font-semibold outline-none"
+                      style={{ color: '#191c20' }}
+                    />
+                    {buscaComanda && (
+                      <button type="button" onClick={() => setBuscaComanda('')}
+                        className="flex h-6 w-6 items-center justify-center rounded-full"
+                        style={{ background: '#f2f3f9', color: '#5d3f3c' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>close</span>
+                      </button>
+                    )}
+                  </label>
+                  {comandasFiltradas.length > 0 && (
+                    <button onClick={() => exportarCsv('comandas')}
+                      className="rounded-xl px-4 py-2 text-xs font-black uppercase tracking-widest"
+                      style={{ background: '#ffffff', color: '#5d3f3c', border: '1px solid #e6e8ee' }}>
+                      Exportar CSV
+                    </button>
+                  )}
+                </div>
               </div>
 
               {comandas.length === 0 ? (
-                <p className="text-sm py-8 text-center" style={{ color: '#926e6b' }}>
-                  Nenhuma comanda fechada no período.
-                </p>
+                <div className="py-8 text-center">
+                  <p className="text-sm" style={{ color: '#926e6b' }}>
+                    Nenhuma comanda fechada no período.
+                  </p>
+                  <button onClick={() => setPeriodoRapido(7)}
+                    className="mt-3 rounded-xl px-4 py-2 text-sm font-bold text-white"
+                    style={{ background: '#b90014' }}>
+                    Ver ultimos 7 dias
+                  </button>
+                </div>
+              ) : comandasFiltradas.length === 0 ? (
+                <div className="py-8 text-center">
+                  <p className="text-sm" style={{ color: '#926e6b' }}>
+                    Nenhuma comanda encontrada para a busca.
+                  </p>
+                  <button onClick={() => setBuscaComanda('')}
+                    className="mt-3 rounded-xl px-4 py-2 text-sm font-bold"
+                    style={{ background: '#ffffff', color: '#5d3f3c', border: '1px solid #e6e8ee' }}>
+                    Limpar busca
+                  </button>
+                </div>
               ) : (
                 <>
                   <div className="flex-shrink-0 grid grid-cols-5 px-4 py-2 text-[10px] font-black uppercase tracking-widest"
@@ -329,7 +557,7 @@ export function GerentePage() {
                     <span className="text-right">Total</span>
                   </div>
                   <div className="flex-1 overflow-y-auto space-y-2 pr-1 mt-1">
-                    {comandas.map(c => (
+                    {comandasFiltradas.map(c => (
                       <div key={c.id}
                         className="grid grid-cols-5 px-4 py-4 rounded-xl items-center"
                         style={{ background: '#ffffff' }}>
@@ -343,7 +571,7 @@ export function GerentePage() {
                           {new Date(c.criadaEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                         </span>
                         <span className="text-right font-bold" style={{ color: '#191c20' }}>
-                          R$ {(c.totalFinal ?? 0).toFixed(2).replace('.', ',')}
+                          {formatCurrencyBRL(c.totalFinal ?? 0)}
                         </span>
                       </div>
                     ))}
@@ -364,3 +592,4 @@ export function GerentePage() {
     </div>
   )
 }
+

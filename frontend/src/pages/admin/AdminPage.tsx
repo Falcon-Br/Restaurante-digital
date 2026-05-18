@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { api } from '../../api/client'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../context/useAuth'
 import { useSignalR } from '../../hooks/useSignalR'
+import { formatCurrencyBRL, maskCurrencyBRL, parseCurrencyBRL } from '../../utils/currency'
 import type { Item, Categoria, Mesa } from '../../api/types'
 
 type Tab = 'cardapio' | 'mesas'
@@ -18,7 +19,6 @@ function extractError(err: unknown): string {
   return 'Erro inesperado. Tente novamente.'
 }
 
-const CAT_ICONS = ['lunch_dining', 'local_bar', 'cookie', 'fastfood', 'cake', 'local_pizza', 'ramen_dining', 'icecream']
 const CAT_COLORS = [
   { bg: '#fef2f2', color: '#b90014' },
   { bg: '#eff6ff', color: '#2563eb' },
@@ -27,6 +27,26 @@ const CAT_COLORS = [
   { bg: '#fdf4ff', color: '#9333ea' },
   { bg: '#fff7ed', color: '#ea580c' },
 ]
+
+const CATEGORY_ICON_RULES = [
+  { match: ['entrada', 'petisco', 'porcao'], icon: 'tapas' },
+  { match: ['lanche', 'burger', 'hamburguer', 'sanduiche'], icon: 'lunch_dining' },
+  { match: ['prato', 'almoco', 'jantar', 'principal'], icon: 'restaurant' },
+  { match: ['bebida', 'suco', 'agua', 'refrigerante'], icon: 'local_drink' },
+  { match: ['sobremesa', 'doce', 'pudim', 'brownie'], icon: 'cake' },
+  { match: ['pizza'], icon: 'local_pizza' },
+  { match: ['massa', 'pasta'], icon: 'ramen_dining' },
+  { match: ['vinho'], icon: 'wine_bar' },
+]
+
+function normalizeText(value: string) {
+  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+}
+
+function categoryIcon(nome: string) {
+  const normalized = normalizeText(nome)
+  return CATEGORY_ICON_RULES.find(rule => rule.match.some(term => normalized.includes(term)))?.icon ?? 'restaurant_menu'
+}
 
 const inputStyle: React.CSSProperties = {
   background: '#f7f9ff',
@@ -39,43 +59,75 @@ const inputStyle: React.CSSProperties = {
   width: '100%',
 }
 
+function afterModalExit(action: () => void) {
+  if (import.meta.env.MODE === 'test') {
+    action()
+    return
+  }
+  setTimeout(action, 160)
+}
+
+function SavingLabel({ saving, idleText }: { saving: boolean; idleText: string }) {
+  return (
+    <span className="inline-flex items-center justify-center gap-2">
+      {saving && (
+        <span className="material-symbols-outlined animate-spin" style={{ fontSize: '1rem' }}>
+          progress_activity
+        </span>
+      )}
+      {saving ? 'Salvando...' : idleText}
+    </span>
+  )
+}
+
 export function AdminPage() {
   const { logout } = useAuth()
   const [tab, setTab] = useState<Tab>('cardapio')
 
-  // ── Cardápio state ──────────────────────────────────────────────
+  // -- Cardápio state ----------------------------------------------
   const [itens, setItens] = useState<Item[]>([])
   const [categorias, setCategorias] = useState<Categoria[]>([])
 
   // Modal categoria (add / edit)
   const [modalCat, setModalCat] = useState(false)
+  const [modalCatClosing, setModalCatClosing] = useState(false)
   const [editandoCat, setEditandoCat] = useState<Categoria | null>(null)
   const [formCat, setFormCat] = useState({ nome: '', cozinhar: true })
   const [salvandoCat, setSalvandoCat] = useState(false)
 
   // Modal item (add / edit)
   const [modalItem, setModalItem] = useState(false)
+  const [modalItemClosing, setModalItemClosing] = useState(false)
   const [editandoItemId, setEditandoItemId] = useState<number | null>(null)
   const [formItem, setFormItem] = useState({ nome: '', descricao: '', preco: '', categoriaId: '', imagemUrl: '' })
   const [salvandoItem, setSalvandoItem] = useState(false)
   const [uploadandoImagem, setUploadandoImagem] = useState(false)
   const [itemModalOrigemCat, setItemModalOrigemCat] = useState<Categoria | null>(null)
+  const [modalExcluirItem, setModalExcluirItem] = useState<Item | null>(null)
+  const [modalExcluirItemClosing, setModalExcluirItemClosing] = useState(false)
 
   // Modal excluir
   const [modalExcluirCat, setModalExcluirCat] = useState<number | null>(null)
+  const [modalExcluirCatClosing, setModalExcluirCatClosing] = useState(false)
 
   // Modal "Ver todas as categorias"
   const [modalTodasCats, setModalTodasCats] = useState(false)
+  const [modalTodasCatsClosing, setModalTodasCatsClosing] = useState(false)
   const [catSelecionadaModal, setCatSelecionadaModal] = useState<Categoria | null>(null)
 
-  // ── Mesas state ─────────────────────────────────────────────────
+  // -- Mesas state -------------------------------------------------
   const [mesas, setMesas] = useState<Mesa[]>([])
   const [modalMesa, setModalMesa] = useState(false)
+  const [modalMesaClosing, setModalMesaClosing] = useState(false)
   const [novoNumeroMesa, setNovoNumeroMesa] = useState('')
   const [salvandoMesa, setSalvandoMesa] = useState(false)
   const [modalExcluirMesa, setModalExcluirMesa] = useState<number | null>(null)
+  const [modalExcluirMesaClosing, setModalExcluirMesaClosing] = useState(false)
+  const [mesaLinkCopiado, setMesaLinkCopiado] = useState<number | null>(null)
+  const [modalQrMesa, setModalQrMesa] = useState<Mesa | null>(null)
+  const [modalQrMesaClosing, setModalQrMesaClosing] = useState(false)
 
-  // ── SignalR ─────────────────────────────────────────────────────
+  // -- SignalR -----------------------------------------------------
   useSignalR({
     onItemEsgotado: (itemId) => setItens(prev => prev.map(i => i.id === itemId ? { ...i, disponivel: false } : i)),
     onItemDisponivel: (itemId) => setItens(prev => prev.map(i => i.id === itemId ? { ...i, disponivel: true } : i)),
@@ -84,7 +136,7 @@ export function AdminPage() {
     onPedidoCancelado: () => carregarMesas(),
   })
 
-  // ── Data loaders ────────────────────────────────────────────────
+  // -- Data loaders ------------------------------------------------
   const carregarCardapio = async () => {
     const [i, c] = await Promise.all([api.get<Item[]>('/itens'), api.get<Categoria[]>('/categorias')])
     setItens(i.data)
@@ -102,23 +154,29 @@ export function AdminPage() {
 
   useEffect(() => { carregarCardapio(); carregarMesas() }, [])
 
-  // ── Categoria actions ───────────────────────────────────────────
+  // -- Categoria actions -------------------------------------------
   const abrirModalNovaCat = () => {
+    setModalCatClosing(false)
     setEditandoCat(null)
     setFormCat({ nome: '', cozinhar: true })
     setModalCat(true)
   }
 
   const abrirModalEditarCat = (cat: Categoria) => {
+    setModalCatClosing(false)
     setEditandoCat(cat)
     setFormCat({ nome: cat.nome, cozinhar: cat.cozinhar })
     setModalCat(true)
   }
 
   const fecharModalCat = () => {
-    setModalCat(false)
-    setEditandoCat(null)
-    setFormCat({ nome: '', cozinhar: true })
+    setModalCatClosing(true)
+    afterModalExit(() => {
+      setModalCat(false)
+      setModalCatClosing(false)
+      setEditandoCat(null)
+      setFormCat({ nome: '', cozinhar: true })
+    })
   }
 
   const salvarCategoria = async (e: React.FormEvent) => {
@@ -144,7 +202,7 @@ export function AdminPage() {
   const confirmarExcluirCategoria = async () => {
     if (modalExcluirCat === null) return
     const id = modalExcluirCat
-    setModalExcluirCat(null)
+    fecharModalExcluirCat()
     try {
       await api.delete(`/categorias/${id}`)
       toast.success('Categoria excluída.')
@@ -154,8 +212,22 @@ export function AdminPage() {
     }
   }
 
-  // ── Item actions ────────────────────────────────────────────────
+  const abrirModalExcluirCat = (id: number) => {
+    setModalExcluirCatClosing(false)
+    setModalExcluirCat(id)
+  }
+
+  const fecharModalExcluirCat = () => {
+    setModalExcluirCatClosing(true)
+    afterModalExit(() => {
+      setModalExcluirCat(null)
+      setModalExcluirCatClosing(false)
+    })
+  }
+
+  // -- Item actions ------------------------------------------------
   const abrirModalNovoItem = (origem?: Categoria) => {
+    setModalItemClosing(false)
     setEditandoItemId(null)
     setItemModalOrigemCat(origem ?? null)
     const catId = origem ? String(origem.id) : (categorias.length > 0 ? String(categorias[0].id) : '')
@@ -164,12 +236,13 @@ export function AdminPage() {
   }
 
   const abrirModalEditarItem = (item: Item, origem?: Categoria) => {
+    setModalItemClosing(false)
     setEditandoItemId(item.id)
     setItemModalOrigemCat(origem ?? null)
     setFormItem({
       nome: item.nome,
       descricao: item.descricao,
-      preco: item.preco.toFixed(2).replace('.', ','),
+      preco: formatCurrencyBRL(item.preco),
       categoriaId: String(item.categoriaId),
       imagemUrl: item.imagemUrl ?? '',
     })
@@ -177,14 +250,35 @@ export function AdminPage() {
   }
 
   const fecharModalItem = (voltarParaCategoria = true) => {
-    setModalItem(false)
-    setEditandoItemId(null)
-    setFormItem({ nome: '', descricao: '', preco: '', categoriaId: '', imagemUrl: '' })
-    if (voltarParaCategoria && itemModalOrigemCat) {
-      setModalTodasCats(true)
-      setCatSelecionadaModal(itemModalOrigemCat)
-    }
-    setItemModalOrigemCat(null)
+    const origem = itemModalOrigemCat
+    setModalItemClosing(true)
+    afterModalExit(() => {
+      setModalItem(false)
+      setModalItemClosing(false)
+      setEditandoItemId(null)
+      setFormItem({ nome: '', descricao: '', preco: '', categoriaId: '', imagemUrl: '' })
+      if (voltarParaCategoria && origem) {
+        setModalTodasCatsClosing(false)
+        setModalTodasCats(true)
+        setCatSelecionadaModal(origem)
+      }
+      setItemModalOrigemCat(null)
+    })
+  }
+
+  const abrirTodasCategorias = (cat: Categoria | null) => {
+    setModalTodasCatsClosing(false)
+    setModalTodasCats(true)
+    setCatSelecionadaModal(cat)
+  }
+
+  const fecharTodasCategorias = () => {
+    setModalTodasCatsClosing(true)
+    afterModalExit(() => {
+      setModalTodasCats(false)
+      setModalTodasCatsClosing(false)
+      setCatSelecionadaModal(null)
+    })
   }
 
   const salvarItem = async (e: React.FormEvent) => {
@@ -194,7 +288,7 @@ export function AdminPage() {
       categoriaId: Number(formItem.categoriaId),
       nome: formItem.nome,
       descricao: formItem.descricao,
-      preco: parseFloat(formItem.preco.replace(',', '.')),
+      preco: parseCurrencyBRL(formItem.preco),
       imagemUrl: formItem.imagemUrl.trim() || null,
     }
     try {
@@ -224,8 +318,23 @@ export function AdminPage() {
     }
   }
 
-  const deletarItem = async (id: number) => {
-    if (!confirm('Remover este item?')) return
+  const abrirModalExcluirItem = (item: Item) => {
+    setModalExcluirItemClosing(false)
+    setModalExcluirItem(item)
+  }
+
+  const fecharModalExcluirItem = () => {
+    setModalExcluirItemClosing(true)
+    afterModalExit(() => {
+      setModalExcluirItem(null)
+      setModalExcluirItemClosing(false)
+    })
+  }
+
+  const confirmarExcluirItem = async () => {
+    if (!modalExcluirItem) return
+    const id = modalExcluirItem.id
+    fecharModalExcluirItem()
     try {
       await api.delete(`/itens/${id}`)
       setItens(prev => prev.filter(i => i.id !== id))
@@ -235,14 +344,14 @@ export function AdminPage() {
     }
   }
 
-  // ── Mesa actions ────────────────────────────────────────────────
+  // -- Mesa actions ------------------------------------------------
   const criarMesa = async (e: React.FormEvent) => {
     e.preventDefault()
     setSalvandoMesa(true)
     try {
       await api.post('/mesas', { numero: Number(novoNumeroMesa) })
       setNovoNumeroMesa('')
-      setModalMesa(false)
+      fecharModalMesa()
       toast.success('Mesa criada!')
       await carregarMesas()
     } catch (err) {
@@ -252,19 +361,33 @@ export function AdminPage() {
     }
   }
 
+  const abrirModalMesa = () => {
+    setModalMesaClosing(false)
+    setModalMesa(true)
+  }
+
+  const fecharModalMesa = () => {
+    setModalMesaClosing(true)
+    afterModalExit(() => {
+      setModalMesa(false)
+      setModalMesaClosing(false)
+    })
+  }
+
   const excluirMesa = (id: number) => {
     const mesa = mesas.find(m => m.id === id)
     if (mesa?.status === 1) {
       toast.error(`Mesa ${mesa.numero} está ocupada e não pode ser excluída.`)
       return
     }
+    setModalExcluirMesaClosing(false)
     setModalExcluirMesa(id)
   }
 
   const confirmarExcluirMesa = async () => {
     if (modalExcluirMesa === null) return
     const id = modalExcluirMesa
-    setModalExcluirMesa(null)
+    fecharModalExcluirMesa()
     try {
       await api.delete(`/mesas/${id}`)
       setMesas(prev => prev.filter(m => m.id !== id))
@@ -274,11 +397,54 @@ export function AdminPage() {
     }
   }
 
-  // ── Render ───────────────────────────────────────────────────────
+  const fecharModalExcluirMesa = () => {
+    setModalExcluirMesaClosing(true)
+    afterModalExit(() => {
+      setModalExcluirMesa(null)
+      setModalExcluirMesaClosing(false)
+    })
+  }
+
+  const copiarLinkMesa = async (mesa: Mesa) => {
+    const link = `${window.location.origin}/menu/${mesa.qrCodeToken}`
+    try {
+      await navigator.clipboard.writeText(link)
+      setMesaLinkCopiado(mesa.id)
+      toast.success(`Link da mesa ${mesa.numero} copiado.`)
+      setTimeout(() => setMesaLinkCopiado(null), 1800)
+    } catch {
+      toast.error('Nao foi possivel copiar o link.')
+    }
+  }
+
+  const abrirQrMesa = (mesa: Mesa) => {
+    setModalQrMesaClosing(false)
+    setModalQrMesa(mesa)
+  }
+
+  const fecharModalQrMesa = () => {
+    setModalQrMesaClosing(true)
+    afterModalExit(() => {
+      setModalQrMesa(null)
+      setModalQrMesaClosing(false)
+    })
+  }
+
+  const copiarPaginaQrMesa = async (mesa: Mesa) => {
+    const link = `${window.location.origin}/qr/${mesa.qrCodeToken}`
+    try {
+      await navigator.clipboard.writeText(link)
+      toast.success(`Página pública do QR da mesa ${mesa.numero} copiada.`)
+    } catch {
+      toast.error('Nao foi possivel copiar a pagina do QR.')
+    }
+  }
+
+  // -- Render -------------------------------------------------------
   return (
     <div className="min-h-screen flex overflow-hidden" style={{ background: '#f7f9ff', fontFamily: 'Inter, sans-serif', color: '#191c20' }}>
 
-      {/* ── Sidebar ── */}
+      {/* -- Sidebar -- */}
       <aside className="hidden md:flex flex-col p-4 gap-2 h-screen sticky top-0 w-64 flex-shrink-0" style={{ background: '#f2f3f9' }}>
         <div className="flex items-center gap-3 px-2 mb-8">
           <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg" style={{ background: '#b90014' }}>
@@ -316,7 +482,7 @@ export function AdminPage() {
         </div>
       </aside>
 
-      {/* ── Main ── */}
+      {/* -- Main -- */}
       <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
 
         {/* Header */}
@@ -353,10 +519,10 @@ export function AdminPage() {
         <main className="flex-1 overflow-y-auto px-6 md:px-8 py-8">
           <div className="max-w-5xl mx-auto space-y-10">
 
-            {/* ══════════════ CARDÁPIO ══════════════ */}
+            {/* ============== CARDÁPIO ============== */}
             {tab === 'cardapio' && (
-              <>
-                {/* Section 1 — Categorias */}
+              <div key="admin-cardapio" className="view-panel">
+                {/* Section 1 - Categorias */}
                 <section>
                   <div className="flex items-center justify-between mb-6">
                     <div>
@@ -381,15 +547,15 @@ export function AdminPage() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 motion-list">
                     {(categorias.length >= 8 ? categorias.slice(0, 7) : categorias).map((cat, idx) => {
                       const palette = CAT_COLORS[idx % CAT_COLORS.length]
-                      const icon = CAT_ICONS[idx % CAT_ICONS.length]
+                      const icon = categoryIcon(cat.nome)
                       const count = itens.filter(i => i.categoriaId === cat.id).length
                       return (
                         <div key={cat.id}
-                          onClick={() => { setModalTodasCats(true); setCatSelecionadaModal(cat) }}
-                          className="p-4 rounded-2xl flex flex-col items-center justify-center text-center group transition-all cursor-pointer"
+                          onClick={() => abrirTodasCategorias(cat)}
+                          className="interactive-card p-4 rounded-2xl flex flex-col items-center justify-center text-center group cursor-pointer"
                           style={{ background: '#ffffff', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
                           <div className="w-12 h-12 rounded-full flex items-center justify-center mb-3 transition-transform group-hover:scale-110"
                             style={{ background: palette.bg }}>
@@ -410,7 +576,7 @@ export function AdminPage() {
                               className="p-2 rounded-lg" style={{ background: '#f2f3f9', color: '#5d3f3c' }}>
                               <span className="material-symbols-outlined" style={{ fontSize: '0.875rem' }}>edit</span>
                             </button>
-                            <button onClick={e => { e.stopPropagation(); setModalExcluirCat(cat.id) }}
+                            <button onClick={e => { e.stopPropagation(); abrirModalExcluirCat(cat.id) }}
                               className="p-2 rounded-lg" style={{ background: '#fef2f2', color: '#b90014' }}>
                               <span className="material-symbols-outlined" style={{ fontSize: '0.875rem' }}>delete</span>
                             </button>
@@ -419,8 +585,8 @@ export function AdminPage() {
                       )
                     })}
                     {categorias.length >= 8 && (
-                      <button onClick={() => { setModalTodasCats(true); setCatSelecionadaModal(null) }}
-                        className="p-4 rounded-2xl flex flex-col items-center justify-center text-center group transition-all"
+                      <button onClick={() => abrirTodasCategorias(null)}
+                        className="interactive-card p-4 rounded-2xl flex flex-col items-center justify-center text-center group"
                         style={{ background: '#f2f3f9', border: '2px dashed #d0d3df' }}>
                         <div className="w-12 h-12 rounded-full flex items-center justify-center mb-3 transition-transform group-hover:scale-110"
                           style={{ background: '#e6e8ee' }}>
@@ -442,21 +608,21 @@ export function AdminPage() {
                   </div>
                 </section>
 
-              </>
+              </div>
             )}
 
-            {/* ══════════════ MESAS ══════════════ */}
+            {/* ============== MESAS ============== */}
             {tab === 'mesas' && (
-              <>
+              <div key="admin-mesas" className="view-panel">
                 <section>
                   <div className="flex items-center justify-between mb-6">
                     <div>
                       <h3 className="text-2xl font-extrabold tracking-tight">Mesas do Salão</h3>
                       <p className="text-xs font-medium mt-0.5" style={{ color: '#926e6b' }}>
-                        {mesas.filter(m => m.status === 1).length} ocupadas · {mesas.filter(m => m.status === 0).length} livres
+                        {mesas.filter(m => m.status === 1).length} ocupadas - {mesas.filter(m => m.status === 0).length} livres
                       </p>
                     </div>
-                    <button onClick={() => setModalMesa(true)}
+                    <button onClick={abrirModalMesa}
                       className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white"
                       style={{ background: '#b90014' }}>
                       <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>add</span>
@@ -469,7 +635,7 @@ export function AdminPage() {
                       style={{ background: '#ffffff', color: '#926e6b' }}>
                       <span className="material-symbols-outlined mb-3" style={{ fontSize: '3rem' }}>table_restaurant</span>
                       <p className="text-sm font-medium">Nenhuma mesa cadastrada.</p>
-                      <button onClick={() => setModalMesa(true)}
+                      <button onClick={abrirModalMesa}
                         className="mt-4 flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white"
                         style={{ background: '#b90014' }}>
                         <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>add</span>
@@ -477,9 +643,9 @@ export function AdminPage() {
                       </button>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4">
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4 motion-list">
                       {mesas.sort((a, b) => a.numero - b.numero).map(m => (
-                        <div key={m.id} className="rounded-2xl p-4 text-center"
+                        <div key={m.id} className="rounded-2xl p-4 text-center transition-transform hover:-translate-y-1"
                           style={{
                             background: '#ffffff',
                             boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
@@ -489,32 +655,48 @@ export function AdminPage() {
                           <div className="text-xs font-semibold mb-3" style={{ color: m.status === 1 ? '#d97706' : '#16a34a' }}>
                             {m.status === 1 ? 'Ocupada' : 'Livre'}
                           </div>
-                          <button onClick={() => excluirMesa(m.id)}
-                            className="w-full flex items-center justify-center gap-1 py-1.5 rounded-xl text-xs font-semibold"
-                            style={{ background: '#fef2f2', color: '#b90014' }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: '0.875rem' }}>delete</span>
-                            Excluir
-                          </button>
+                          <div className="space-y-2">
+                            <button onClick={() => abrirQrMesa(m)}
+                              className="w-full flex items-center justify-center gap-1 py-1.5 rounded-xl text-xs font-semibold"
+                              style={{ background: '#fff7ed', color: '#b90014' }}>
+                              <span className="material-symbols-outlined" style={{ fontSize: '0.875rem' }}>qr_code_2</span>
+                              QR Code
+                            </button>
+                            <button onClick={() => copiarLinkMesa(m)}
+                              className="w-full flex items-center justify-center gap-1 py-1.5 rounded-xl text-xs font-semibold"
+                              style={{ background: '#f2f3f9', color: '#5d3f3c' }}>
+                              <span className="material-symbols-outlined" style={{ fontSize: '0.875rem' }}>
+                                {mesaLinkCopiado === m.id ? 'check' : 'link'}
+                              </span>
+                              {mesaLinkCopiado === m.id ? 'Copiado' : 'Link'}
+                            </button>
+                            <button onClick={() => excluirMesa(m.id)}
+                              className="w-full flex items-center justify-center gap-1 py-1.5 rounded-xl text-xs font-semibold"
+                              style={{ background: '#fef2f2', color: '#b90014' }}>
+                              <span className="material-symbols-outlined" style={{ fontSize: '0.875rem' }}>delete</span>
+                              Excluir
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
                   )}
                 </section>
-              </>
+              </div>
             )}
 
           </div>
         </main>
       </div>
 
-      {/* ════════════════ MODAIS ════════════════ */}
+      {/* ================ MODAIS ================ */}
 
-      {/* Modal — Nova / Editar Categoria */}
+      {/* Modal - Nova / Editar Categoria */}
       {modalCat && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 p-4"
+        <div className={`modal-backdrop fixed inset-0 flex items-center justify-center z-50 p-4 ${modalCatClosing ? 'modal-exit' : ''}`}
           style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
           onClick={e => { if (e.target === e.currentTarget) fecharModalCat() }}>
-          <div className="bg-white rounded-2xl w-full max-w-md"
+          <div className="modal-surface bg-white rounded-2xl w-full max-w-md"
             style={{ boxShadow: '0 32px 64px rgba(0,0,0,0.15)' }}>
             <div className="flex items-center justify-between px-6 py-5" style={{ borderBottom: '1px solid #e6e8ee' }}>
               <div>
@@ -549,14 +731,14 @@ export function AdminPage() {
               </label>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={fecharModalCat}
-                  className="flex-1 py-3 rounded-xl text-sm font-semibold"
+                  className="modal-cancel flex-1 py-3 rounded-xl text-sm font-semibold"
                   style={{ border: '1.5px solid #e6e8ee', color: '#5d3f3c' }}>
                   Cancelar
                 </button>
                 <button type="submit" disabled={salvandoCat}
                   className="flex-1 py-3 rounded-xl text-sm font-bold text-white"
                   style={{ background: 'linear-gradient(135deg, #b90014, #e31b23)', opacity: salvandoCat ? 0.6 : 1 }}>
-                  {salvandoCat ? '...' : editandoCat ? 'Salvar Alterações' : 'Criar Categoria'}
+                  <SavingLabel saving={salvandoCat} idleText={editandoCat ? 'Salvar alterações' : 'Criar categoria'} />
                 </button>
               </div>
             </form>
@@ -564,12 +746,12 @@ export function AdminPage() {
         </div>
       )}
 
-      {/* Modal — Novo / Editar Item */}
+      {/* Modal - Novo / Editar Item */}
       {modalItem && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 p-4"
+        <div className={`modal-backdrop fixed inset-0 flex items-center justify-center z-50 p-4 ${modalItemClosing ? 'modal-exit' : ''}`}
           style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
           onClick={e => { if (e.target === e.currentTarget) fecharModalItem() }}>
-          <div className="bg-white rounded-2xl w-full max-w-lg"
+          <div className="modal-surface bg-white rounded-2xl w-full max-w-lg"
             style={{ boxShadow: '0 32px 64px rgba(0,0,0,0.15)' }}>
             <div className="flex items-center justify-between px-6 py-5" style={{ borderBottom: '1px solid #e6e8ee' }}>
               <div className="flex items-center gap-3">
@@ -607,7 +789,8 @@ export function AdminPage() {
                     Preço (R$)
                   </label>
                   <input placeholder="0,00" value={formItem.preco}
-                    onChange={e => setFormItem(f => ({ ...f, preco: e.target.value }))}
+                    inputMode="numeric"
+                    onChange={e => setFormItem(f => ({ ...f, preco: maskCurrencyBRL(e.target.value) }))}
                     style={inputStyle} required />
                 </div>
               </div>
@@ -631,8 +814,22 @@ export function AdminPage() {
                 <label className="block text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: '#926e6b' }}>
                   Imagem
                 </label>
-                <div className="flex gap-3 items-center">
-                  <label className="flex-1 flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all"
+                <div className="flex flex-col gap-3">
+                  {formItem.imagemUrl && (
+                    <div className="relative overflow-hidden rounded-2xl"
+                      style={{ border: '1px solid #e6e8ee', background: '#f7f9ff' }}>
+                      <img src={formItem.imagemUrl} alt="Preview do item"
+                        loading="lazy" decoding="async"
+                        className="smooth-image h-40 w-full object-cover" />
+                      <button type="button"
+                        onClick={() => setFormItem(f => ({ ...f, imagemUrl: '' }))}
+                        className="absolute right-3 top-3 h-9 w-9 rounded-xl flex items-center justify-center transition-transform hover:scale-105"
+                        style={{ background: 'rgba(185,0,20,0.95)', color: '#fff' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>close</span>
+                      </button>
+                    </div>
+                  )}
+                  <label className="flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all"
                     style={{ background: '#f7f9ff', border: '1.5px dashed #d0d3df' }}>
                     <span className="material-symbols-outlined" style={{ color: '#926e6b', fontSize: '1.25rem' }}>
                       {uploadandoImagem ? 'hourglass_empty' : 'upload'}
@@ -661,31 +858,18 @@ export function AdminPage() {
                         }
                       }} />
                   </label>
-                  {formItem.imagemUrl && (
-                    <div className="relative flex-shrink-0">
-                      <img src={formItem.imagemUrl} alt="preview"
-                        className="w-16 h-16 rounded-xl object-cover"
-                        style={{ border: '1px solid #e6e8ee' }} />
-                      <button type="button"
-                        onClick={() => setFormItem(f => ({ ...f, imagemUrl: '' }))}
-                        className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center"
-                        style={{ background: '#b90014', color: '#fff' }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: '0.75rem' }}>close</span>
-                      </button>
-                    </div>
-                  )}
                 </div>
               </div>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => fecharModalItem()}
-                  className="flex-1 py-3 rounded-xl text-sm font-semibold"
+                  className="modal-cancel flex-1 py-3 rounded-xl text-sm font-semibold"
                   style={{ border: '1.5px solid #e6e8ee', color: '#5d3f3c' }}>
                   Cancelar
                 </button>
                 <button type="submit" disabled={salvandoItem}
                   className="flex-1 py-3 rounded-xl text-sm font-bold text-white"
                   style={{ background: 'linear-gradient(135deg, #b90014, #e31b23)', opacity: salvandoItem ? 0.6 : 1 }}>
-                  {salvandoItem ? '...' : editandoItemId !== null ? 'Salvar Alterações' : 'Adicionar ao Menu'}
+                  <SavingLabel saving={salvandoItem} idleText={editandoItemId !== null ? 'Salvar alterações' : 'Adicionar ao menu'} />
                 </button>
               </div>
             </form>
@@ -693,19 +877,19 @@ export function AdminPage() {
         </div>
       )}
 
-      {/* Modal — Nova Mesa */}
+      {/* Modal - Nova Mesa */}
       {modalMesa && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 p-4"
+        <div className={`modal-backdrop fixed inset-0 flex items-center justify-center z-50 p-4 ${modalMesaClosing ? 'modal-exit' : ''}`}
           style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
-          onClick={e => { if (e.target === e.currentTarget) setModalMesa(false) }}>
-          <div className="bg-white rounded-2xl w-full max-w-sm"
+          onClick={e => { if (e.target === e.currentTarget) fecharModalMesa() }}>
+          <div className="modal-surface bg-white rounded-2xl w-full max-w-sm"
             style={{ boxShadow: '0 32px 64px rgba(0,0,0,0.15)' }}>
             <div className="flex items-center justify-between px-6 py-5" style={{ borderBottom: '1px solid #e6e8ee' }}>
               <div>
                 <h3 className="text-base font-bold">Nova Mesa</h3>
                 <p className="text-xs mt-0.5" style={{ color: '#926e6b' }}>Adicione uma mesa ao salão</p>
               </div>
-              <button onClick={() => setModalMesa(false)} className="p-2 rounded-lg" style={{ background: '#f2f3f9', color: '#5d3f3c' }}>
+              <button onClick={fecharModalMesa} className="p-2 rounded-lg" style={{ background: '#f2f3f9', color: '#5d3f3c' }}>
                 <span className="material-symbols-outlined" style={{ fontSize: '1.1rem' }}>close</span>
               </button>
             </div>
@@ -719,15 +903,15 @@ export function AdminPage() {
                   min={1} style={inputStyle} required />
               </div>
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setModalMesa(false)}
-                  className="flex-1 py-3 rounded-xl text-sm font-semibold"
+                <button type="button" onClick={fecharModalMesa}
+                  className="modal-cancel flex-1 py-3 rounded-xl text-sm font-semibold"
                   style={{ border: '1.5px solid #e6e8ee', color: '#5d3f3c' }}>
                   Cancelar
                 </button>
                 <button type="submit" disabled={salvandoMesa}
                   className="flex-1 py-3 rounded-xl text-sm font-bold text-white"
                   style={{ background: 'linear-gradient(135deg, #b90014, #e31b23)', opacity: salvandoMesa ? 0.6 : 1 }}>
-                  {salvandoMesa ? '...' : 'Criar Mesa'}
+                  <SavingLabel saving={salvandoMesa} idleText="Criar mesa" />
                 </button>
               </div>
             </form>
@@ -735,16 +919,16 @@ export function AdminPage() {
         </div>
       )}
 
-      {/* Modal — Excluir Mesa */}
+      {/* Modal - Excluir Mesa */}
       {modalExcluirMesa !== null && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 p-4"
+        <div className={`modal-backdrop fixed inset-0 flex items-center justify-center z-50 p-4 ${modalExcluirMesaClosing ? 'modal-exit' : ''}`}
           style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}>
-          <div className="bg-white rounded-2xl p-6 w-full max-w-sm" style={{ boxShadow: '0 32px 64px rgba(185,0,20,0.12)' }}>
+          <div className="modal-surface bg-white rounded-2xl p-6 w-full max-w-sm" style={{ boxShadow: '0 32px 64px rgba(185,0,20,0.12)' }}>
             <h3 className="text-lg font-bold mb-2 text-center">Excluir mesa?</h3>
             <p className="text-sm text-center mb-6" style={{ color: '#926e6b' }}>Esta ação não pode ser desfeita.</p>
             <div className="flex gap-3">
-              <button onClick={() => setModalExcluirMesa(null)}
-                className="flex-1 py-3 rounded-xl font-semibold"
+              <button onClick={fecharModalExcluirMesa}
+                className="modal-cancel flex-1 py-3 rounded-xl font-semibold"
                 style={{ border: '1.5px solid #e6e8ee', color: '#5d3f3c' }}>
                 Cancelar
               </button>
@@ -758,18 +942,18 @@ export function AdminPage() {
         </div>
       )}
 
-      {/* Modal — Excluir Categoria */}
+      {/* Modal - Excluir Categoria */}
       {modalExcluirCat !== null && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 p-4"
+        <div className={`modal-backdrop fixed inset-0 flex items-center justify-center z-50 p-4 ${modalExcluirCatClosing ? 'modal-exit' : ''}`}
           style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}>
-          <div className="bg-white rounded-2xl p-6 w-full max-w-sm" style={{ boxShadow: '0 32px 64px rgba(185,0,20,0.12)' }}>
+          <div className="modal-surface bg-white rounded-2xl p-6 w-full max-w-sm" style={{ boxShadow: '0 32px 64px rgba(185,0,20,0.12)' }}>
             <h3 className="text-lg font-bold mb-2 text-center">Excluir categoria?</h3>
             <p className="text-sm text-center mb-6" style={{ color: '#926e6b' }}>
               Os itens vinculados a esta categoria também serão removidos.
             </p>
             <div className="flex gap-3">
-              <button onClick={() => setModalExcluirCat(null)}
-                className="flex-1 py-3 rounded-xl font-semibold"
+              <button onClick={fecharModalExcluirCat}
+                className="modal-cancel flex-1 py-3 rounded-xl font-semibold"
                 style={{ border: '1.5px solid #e6e8ee', color: '#5d3f3c' }}>
                 Cancelar
               </button>
@@ -783,12 +967,37 @@ export function AdminPage() {
         </div>
       )}
 
-      {/* Modal — Todas as Categorias */}
+      {/* Modal - Excluir Item */}
+      {modalExcluirItem !== null && (
+        <div className={`modal-backdrop fixed inset-0 flex items-center justify-center z-50 p-4 ${modalExcluirItemClosing ? 'modal-exit' : ''}`}
+          style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}>
+          <div className="modal-surface bg-white rounded-2xl p-6 w-full max-w-sm" style={{ boxShadow: '0 32px 64px rgba(185,0,20,0.12)' }}>
+            <h3 className="text-lg font-bold mb-2 text-center">Excluir item?</h3>
+            <p className="text-sm text-center mb-6" style={{ color: '#926e6b' }}>
+              {modalExcluirItem.nome} será removido do cardápio.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={fecharModalExcluirItem}
+                className="modal-cancel flex-1 py-3 rounded-xl font-semibold"
+                style={{ border: '1.5px solid #e6e8ee', color: '#5d3f3c' }}>
+                Cancelar
+              </button>
+              <button onClick={confirmarExcluirItem}
+                className="flex-1 py-3 rounded-xl font-semibold text-white"
+                style={{ background: 'linear-gradient(135deg, #b90014, #d4001a)' }}>
+                Excluir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal - Todas as Categorias */}
       {modalTodasCats && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 p-4"
+        <div className={`modal-backdrop fixed inset-0 flex items-center justify-center z-50 p-4 ${modalTodasCatsClosing ? 'modal-exit' : ''}`}
           style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
-          onClick={e => { if (e.target === e.currentTarget) { setModalTodasCats(false); setCatSelecionadaModal(null) } }}>
-          <div className="bg-white rounded-2xl w-full max-w-2xl flex flex-col"
+          onClick={e => { if (e.target === e.currentTarget) fecharTodasCategorias() }}>
+          <div className="modal-surface bg-white rounded-2xl w-full max-w-2xl flex flex-col"
             style={{ maxHeight: '85vh', boxShadow: '0 32px 64px rgba(0,0,0,0.15)' }}>
 
             <div className="flex items-center justify-between px-6 py-5 flex-shrink-0" style={{ borderBottom: '1px solid #e6e8ee' }}>
@@ -813,14 +1022,21 @@ export function AdminPage() {
               )}
               <div className="flex items-center gap-2">
                 {catSelecionadaModal && (
-                  <button onClick={() => { setModalTodasCats(false); abrirModalNovoItem(catSelecionadaModal) }}
+                  <button onClick={() => {
+                    setModalTodasCatsClosing(true)
+                    afterModalExit(() => {
+                      setModalTodasCats(false)
+                      setModalTodasCatsClosing(false)
+                      abrirModalNovoItem(catSelecionadaModal)
+                    })
+                  }}
                     className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold text-white"
                     style={{ background: '#b90014' }}>
                     <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>add</span>
                     Adicionar Item
                   </button>
                 )}
-                <button onClick={() => { setModalTodasCats(false); setCatSelecionadaModal(null) }}
+                <button onClick={fecharTodasCategorias}
                   className="p-2 rounded-lg" style={{ background: '#f2f3f9', color: '#5d3f3c' }}>
                   <span className="material-symbols-outlined" style={{ fontSize: '1.1rem' }}>close</span>
                 </button>
@@ -829,15 +1045,15 @@ export function AdminPage() {
 
             <div className="overflow-y-auto flex-1 p-6">
               {!catSelecionadaModal ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                <div key="categorias" className="tab-panel grid grid-cols-2 sm:grid-cols-3 gap-4 motion-list">
                   {categorias.map((cat, idx) => {
                     const palette = CAT_COLORS[idx % CAT_COLORS.length]
-                    const icon = CAT_ICONS[idx % CAT_ICONS.length]
+                    const icon = categoryIcon(cat.nome)
                     const count = itens.filter(i => i.categoriaId === cat.id).length
                     return (
                       <button key={cat.id}
                         onClick={() => setCatSelecionadaModal(cat)}
-                        className="p-4 rounded-2xl flex flex-col items-center justify-center text-center group transition-all w-full"
+                        className="interactive-card p-4 rounded-2xl flex flex-col items-center justify-center text-center group w-full"
                         style={{ background: '#f7f9ff', border: '1px solid #e6e8ee' }}>
                         <div className="w-12 h-12 rounded-full flex items-center justify-center mb-3 transition-transform group-hover:scale-110"
                           style={{ background: palette.bg }}>
@@ -861,30 +1077,44 @@ export function AdminPage() {
                 </div>
               ) : (() => {
                 const catIdx = categorias.findIndex(c => c.id === catSelecionadaModal.id)
-                const palette = CAT_COLORS[catIdx % CAT_COLORS.length]
+                const palette = CAT_COLORS[Math.max(catIdx, 0) % CAT_COLORS.length]
                 const catItens = itens.filter(i => i.categoriaId === catSelecionadaModal.id)
                 return (
-                  <div className="space-y-3">
+                  <div key={catSelecionadaModal.id} className="tab-panel space-y-3 motion-list">
                     {catItens.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-10 rounded-2xl"
                         style={{ background: '#f7f9ff', color: '#926e6b' }}>
                         <span className="material-symbols-outlined mb-2" style={{ fontSize: '2rem' }}>inventory_2</span>
-                        <p className="text-sm">Nenhum item nesta categoria.</p>
+                        <p className="text-sm font-semibold">Nenhum item nesta categoria.</p>
+                        <button onClick={() => {
+                          const origem = catSelecionadaModal
+                          setModalTodasCatsClosing(true)
+                          afterModalExit(() => {
+                            setModalTodasCats(false)
+                            setModalTodasCatsClosing(false)
+                            abrirModalNovoItem(origem)
+                          })
+                        }}
+                          className="mt-4 flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-transform hover:-translate-y-0.5"
+                          style={{ background: '#b90014' }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>add</span>
+                          Adicionar item nesta categoria
+                        </button>
                       </div>
                     ) : (
                       catItens.map(item => (
                         <div key={item.id}
-                          className="flex flex-col lg:flex-row lg:items-center justify-between p-5 rounded-2xl group transition-all"
+                          className="interactive-card flex flex-col lg:flex-row lg:items-start justify-between gap-4 p-5 rounded-2xl group"
                           style={{ background: '#ffffff', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-                          <div className="flex items-center gap-5 mb-4 lg:mb-0">
-                            <div className="w-16 h-16 rounded-2xl flex-shrink-0 flex items-center justify-center overflow-hidden"
+                          <div className="flex items-center gap-5 flex-1 min-w-0">
+                            <div className="image-frame w-16 h-16 rounded-2xl flex-shrink-0 flex items-center justify-center overflow-hidden"
                               style={{ background: palette.bg }}>
                               {item.imagemUrl
-                                ? <img src={item.imagemUrl} alt={item.nome} className="w-full h-full object-cover" />
-                                : <span className="material-symbols-outlined" style={{ color: palette.color, fontSize: '1.75rem' }}>{CAT_ICONS[catIdx % CAT_ICONS.length]}</span>
+                                ? <img src={item.imagemUrl} alt={item.nome} loading="lazy" decoding="async" className="smooth-image w-full h-full object-cover" />
+                                : <span className="material-symbols-outlined" style={{ color: palette.color, fontSize: '1.75rem' }}>{categoryIcon(catSelecionadaModal.nome)}</span>
                               }
                             </div>
-                            <div>
+                            <div className="min-w-0">
                               <h5 className={`text-base font-bold ${!item.disponivel ? 'line-through' : ''}`}
                                 style={{ color: item.disponivel ? '#191c20' : '#926e6b' }}>
                                 {item.nome}
@@ -893,19 +1123,21 @@ export function AdminPage() {
                                 <p className="text-sm mt-0.5 max-w-md" style={{ color: '#926e6b' }}>{item.descricao}</p>
                               )}
                               <span className="text-base font-black mt-1 block" style={{ color: '#b90014' }}>
-                                R$ {item.preco.toFixed(2).replace('.', ',')}
+                                {formatCurrencyBRL(item.preco)}
                               </span>
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-6 justify-between lg:justify-end">
-                            <div className="flex items-center gap-3">
-                              <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#926e6b' }}>
+                          <div className="flex w-full flex-row-reverse items-center justify-between gap-3 lg:w-auto lg:flex-col lg:items-end lg:justify-start">
+                            <div className="order-2 flex items-center gap-3 rounded-full px-3 py-2"
+                              style={{ background: item.disponivel ? '#eef8f1' : '#f2f3f9' }}>
+                              <span className="text-[10px] font-bold uppercase tracking-wider whitespace-nowrap"
+                                style={{ color: item.disponivel ? '#428057' : '#926e6b' }}>
                                 {item.disponivel ? 'Disponível' : 'Esgotado'}
                               </span>
                               <button onClick={() => toggleDisponivel(item.id)}
-                                className="relative inline-flex items-center"
-                                style={{ width: '2.75rem', height: '1.5rem' }}
+                                className="relative inline-flex items-center transition-transform hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                                style={{ width: '2.75rem', height: '1.5rem', outlineColor: '#b90014' }}
                                 aria-label="Toggle disponibilidade">
                                 <span className="block w-full h-full rounded-full transition-colors"
                                   style={{ background: item.disponivel ? '#428057' : '#d8dae0' }} />
@@ -919,17 +1151,22 @@ export function AdminPage() {
                               </button>
                             </div>
 
-                            <div className="flex items-center gap-2">
+                            <div className="order-1 flex items-center gap-2">
                               <button
                                 onClick={() => {
-                                  setModalTodasCats(false)
-                                  abrirModalEditarItem(item, catSelecionadaModal ?? undefined)
+                                  const origem = catSelecionadaModal ?? undefined
+                                  setModalTodasCatsClosing(true)
+                                  afterModalExit(() => {
+                                    setModalTodasCats(false)
+                                    setModalTodasCatsClosing(false)
+                                    abrirModalEditarItem(item, origem)
+                                  })
                                 }}
                                 className="w-10 h-10 flex items-center justify-center rounded-xl transition-colors"
                                 style={{ background: '#f2f3f9', color: '#5d3f3c' }}>
                                 <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>edit</span>
                               </button>
-                              <button onClick={() => deletarItem(item.id)}
+                              <button onClick={() => abrirModalExcluirItem(item)}
                                 className="w-10 h-10 flex items-center justify-center rounded-xl transition-colors"
                                 style={{ background: '#fef2f2', color: '#b90014' }}>
                                 <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>delete</span>
@@ -946,6 +1183,79 @@ export function AdminPage() {
           </div>
         </div>
       )}
+      {modalQrMesa && (
+        <div className={`modal-backdrop fixed inset-0 flex items-center justify-center z-50 p-4 ${modalQrMesaClosing ? 'modal-exit' : ''}`}
+          style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
+          onClick={e => { if (e.target === e.currentTarget) fecharModalQrMesa() }}>
+          <div className="modal-surface bg-white rounded-2xl w-full max-w-md overflow-hidden"
+            style={{ boxShadow: '0 32px 64px rgba(0,0,0,0.15)' }}>
+            <div className="flex items-center justify-between px-6 py-5" style={{ borderBottom: '1px solid #e6e8ee' }}>
+              <div>
+                <h3 className="text-base font-bold">QR Code da Mesa {modalQrMesa.numero}</h3>
+                <p className="text-xs mt-0.5" style={{ color: '#926e6b' }}>
+                  Publico, sem login, apontando para o cardapio da mesa.
+                </p>
+              </div>
+              <button onClick={fecharModalQrMesa} className="p-2 rounded-lg" style={{ background: '#f2f3f9', color: '#5d3f3c' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '1.1rem' }}>close</span>
+              </button>
+            </div>
+
+            <div className="p-6">
+              <div className="mx-auto max-w-[16rem] rounded-3xl p-4 text-center"
+                style={{ background: '#f7f9ff', border: '1px solid #e6e8ee' }}>
+                <img
+                  src={`/api/mesas/token/${modalQrMesa.qrCodeToken}/qrcode`}
+                  alt={`QR Code da mesa ${modalQrMesa.numero}`}
+                  className="h-full w-full rounded-2xl bg-white"
+                />
+                <p className="mt-3 text-[10px] font-black uppercase tracking-widest" style={{ color: '#5d3f3c' }}>
+                  Mesa {modalQrMesa.numero}
+                </p>
+              </div>
+
+              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                <a
+                  href={`/api/mesas/${modalQrMesa.id}/qrcode`}
+                  download={`mesa-${modalQrMesa.numero}-qr.png`}
+                  className="flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-white"
+                  style={{ background: '#b90014' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>download</span>
+                  Baixar PNG
+                </a>
+                <button
+                  onClick={() => copiarPaginaQrMesa(modalQrMesa)}
+                  className="flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold"
+                  style={{ background: '#f2f3f9', color: '#5d3f3c', border: '1px solid #e6e8ee' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>content_copy</span>
+                  Copiar pagina
+                </button>
+              </div>
+
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <a
+                  href={`/qr/${modalQrMesa.qrCodeToken}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold"
+                  style={{ background: '#ffffff', color: '#5d3f3c', border: '1px solid #e6e8ee' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>open_in_new</span>
+                  Ver publico
+                </a>
+                <button
+                  onClick={() => copiarLinkMesa(modalQrMesa)}
+                  className="flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold"
+                  style={{ background: '#ffffff', color: '#5d3f3c', border: '1px solid #e6e8ee' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>link</span>
+                  Copiar cardapio
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
+
+

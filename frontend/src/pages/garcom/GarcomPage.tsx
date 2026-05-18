@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { toast } from 'sonner'
 import { api } from '../../api/client'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../context/useAuth'
 import { useSignalR } from '../../hooks/useSignalR'
+import { formatCurrencyBRL } from '../../utils/currency'
 import type { Mesa, Item, Categoria, Comanda, Pedido, PedidoItemStatus } from '../../api/types'
 
 type CartItem = { itemId: number; nome: string; preco: number; quantidade: number; observacao: string }
@@ -29,8 +30,42 @@ const CAT_GRADIENTS = [
   'linear-gradient(135deg, #fdf4ff, #e9d5ff)',
   'linear-gradient(135deg, #fff7ed, #fed7aa)',
 ]
-const CAT_ICONS = ['lunch_dining', 'local_bar', 'cookie', 'fastfood', 'cake', 'local_pizza']
 const CAT_ICON_COLORS = ['#b90014', '#2563eb', '#d97706', '#16a34a', '#9333ea', '#ea580c']
+
+const CATEGORY_ICON_RULES = [
+  { match: ['entrada', 'petisco', 'porcao'], icon: 'tapas' },
+  { match: ['lanche', 'burger', 'hamburguer', 'sanduiche'], icon: 'lunch_dining' },
+  { match: ['prato', 'almoco', 'jantar', 'principal'], icon: 'restaurant' },
+  { match: ['bebida', 'suco', 'agua', 'refrigerante'], icon: 'local_drink' },
+  { match: ['sobremesa', 'doce', 'pudim', 'brownie'], icon: 'cake' },
+  { match: ['pizza'], icon: 'local_pizza' },
+  { match: ['massa', 'pasta'], icon: 'ramen_dining' },
+  { match: ['vinho'], icon: 'wine_bar' },
+]
+
+function normalizeText(value: string) {
+  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+}
+
+function categoryIcon(nome: string) {
+  const normalized = normalizeText(nome)
+  return CATEGORY_ICON_RULES.find(rule => rule.match.some(term => normalized.includes(term)))?.icon ?? 'restaurant_menu'
+}
+
+function formatUpdatedAt(timestamp: number | null, now = Date.now()) {
+  if (!timestamp) return 'Ainda não atualizado'
+  const seconds = Math.max(0, Math.floor((now - timestamp) / 1000))
+  if (seconds < 5) return 'Atualizado agora'
+  if (seconds < 60) return `Atualizado há ${seconds}s`
+  const minutes = Math.floor(seconds / 60)
+  return `Atualizado há ${minutes}min`
+}
+
+function totalComanda(comanda: Comanda) {
+  return comanda.pedidos
+    .flatMap(p => p.itens)
+    .reduce((a, i) => a + i.itemPreco * i.quantidade, 0)
+}
 
 const STATUS_LABEL: Record<PedidoItemStatus, string> = {
   Pendente: 'Aguardando',
@@ -50,6 +85,7 @@ const STATUS_BG: Record<PedidoItemStatus, string> = {
   Pronto: '#f0fdf4',
   Entregue: '#f3f4f6',
 }
+const PEDIDOS_CACHE_TTL_MS = 30_000
 
 export function GarcomPage() {
   const { user, logout } = useAuth()
@@ -65,18 +101,29 @@ export function GarcomPage() {
   const [categorias, setCategorias] = useState<Categoria[]>([])
   const [catFiltro, setCatFiltro] = useState<number | null>(null)
   const [filtroMesa, setFiltroMesa] = useState<'todas' | 'livres' | 'ocupadas'>('todas')
+  const [buscaMesa, setBuscaMesa] = useState('')
+  const [viewTransition, setViewTransition] = useState<'idle' | 'mesas-exit' | 'mesa-exit'>('idle')
   const [cart, setCart] = useState<CartItem[]>([])
   const [mostrarCart, setMostrarCart] = useState(false)
 
   const [modalConfirmarComanda, setModalConfirmarComanda] = useState(false)
+  const [modalConfirmarComandaClosing, setModalConfirmarComandaClosing] = useState(false)
   const [modalNomeComanda, setModalNomeComanda] = useState(false)
+  const [modalNomeComandaClosing, setModalNomeComandaClosing] = useState(false)
   const [nomeComanda, setNomeComanda] = useState('')
   const [modalSelecionarComanda, setModalSelecionarComanda] = useState(false)
+  const [modalSelecionarComandaClosing, setModalSelecionarComandaClosing] = useState(false)
+  const [modalFecharComanda, setModalFecharComanda] = useState<Comanda | null>(null)
+  const [modalFecharComandaClosing, setModalFecharComandaClosing] = useState(false)
 
   // ── Pedidos ─────────────────────────────────────────────────────
   const [todosPedidos, setTodosPedidos] = useState<Pedido[]>([])
   const [carregandoPedidos, setCarregandoPedidos] = useState(false)
   const [entregandoItem, setEntregandoItem] = useState<number | null>(null)
+  const [pedidosAtualizadosEm, setPedidosAtualizadosEm] = useState<number | null>(null)
+  const [itensRecemProntos, setItensRecemProntos] = useState<number[]>([])
+  const [agora, setAgora] = useState(Date.now())
+  const pedidosCacheRef = useRef({ fetchedAt: 0, hasData: false })
 
   // ── Drag-to-scroll (category pills) ────────────────────────────
   const catScrollRef = useRef<HTMLDivElement>(null)
@@ -93,11 +140,19 @@ export function GarcomPage() {
     setComandas(data)
   }, [])
 
-  const carregarPedidos = useCallback(async () => {
+  const carregarPedidos = useCallback(async (options?: { force?: boolean }) => {
+    const cacheAge = Date.now() - pedidosCacheRef.current.fetchedAt
+    if (!options?.force && pedidosCacheRef.current.hasData && cacheAge < PEDIDOS_CACHE_TTL_MS) {
+      return
+    }
     setCarregandoPedidos(true)
     try {
       const { data } = await api.get<Pedido[]>('/pedidos?status=Aberto')
       setTodosPedidos(data)
+      const fetchedAt = Date.now()
+      pedidosCacheRef.current = { fetchedAt, hasData: true }
+      setPedidosAtualizadosEm(fetchedAt)
+      setAgora(fetchedAt)
     } catch {
       toast.error('Erro ao carregar pedidos.')
     } finally {
@@ -116,11 +171,18 @@ export function GarcomPage() {
       setCategorias(c.data)
       if (c.data.length > 0) setCatFiltro(c.data[0].id)
     })
-  }, [])
+    carregarPedidos({ force: true })
+  }, [carregarPedidos])
 
   useEffect(() => {
     if (abaTopLevel === 'pedidos') carregarPedidos()
   }, [abaTopLevel, carregarPedidos])
+
+  useEffect(() => {
+    if (abaTopLevel !== 'pedidos') return
+    const timer = window.setInterval(() => setAgora(Date.now()), 10_000)
+    return () => window.clearInterval(timer)
+  }, [abaTopLevel])
 
   // ── SignalR ─────────────────────────────────────────────────────
   useSignalR({
@@ -129,17 +191,20 @@ export function GarcomPage() {
     onMesasAtualizadas: () => carregarMesas(),
     onPedidoCancelado: () => {
       if (mesaSelecionada) carregarComandas(mesaSelecionada.id)
-      carregarPedidos()
+      carregarPedidos({ force: true })
     },
     onPedidoFechado: () => {
       if (mesaSelecionada) carregarComandas(mesaSelecionada.id)
-      carregarPedidos()
+      carregarPedidos({ force: true })
     },
     onNovoPedido: () => {
-      carregarPedidos()
+      carregarPedidos({ force: true })
       carregarMesas()
     },
     onStatusAtualizado: (pedidoItemId, novoStatus) => {
+      const updatedAt = Date.now()
+      setPedidosAtualizadosEm(updatedAt)
+      setAgora(updatedAt)
       setTodosPedidos(prev => {
         let toastMsg = ''
         const updated = prev.map(p => ({
@@ -147,6 +212,10 @@ export function GarcomPage() {
           itens: p.itens.map(i => {
             if (i.id === pedidoItemId) {
               if (novoStatus === 'Pronto') {
+                setItensRecemProntos(current => current.includes(i.id) ? current : [...current, i.id])
+                setTimeout(() => {
+                  setItensRecemProntos(current => current.filter(id => id !== i.id))
+                }, 2200)
                 toastMsg = `Mesa ${p.mesaNumero} — ${i.itemNome} pronto para entregar!`
               }
               return { ...i, status: novoStatus as PedidoItemStatus }
@@ -194,6 +263,9 @@ export function GarcomPage() {
         ...p,
         itens: p.itens.map(i => i.id === pedidoItemId ? { ...i, status: 'Entregue' as const } : i),
       })))
+      const updatedAt = Date.now()
+      setPedidosAtualizadosEm(updatedAt)
+      setAgora(updatedAt)
       toast.success('Item marcado como entregue!')
     } catch {
       toast.error('Erro ao marcar como entregue.')
@@ -263,13 +335,45 @@ export function GarcomPage() {
   const handleEnviarClick = () => {
     if (comandas.length === 0) enviarSemComanda()
     else if (comandas.length === 1) enviarPedido(comandas[0].id)
-    else setModalSelecionarComanda(true)
+    else {
+      setModalSelecionarComandaClosing(false)
+      setModalSelecionarComanda(true)
+    }
   }
 
   const confirmarCriarComanda = () => {
-    setModalConfirmarComanda(false)
-    setNomeComanda('')
-    setModalNomeComanda(true)
+    setModalConfirmarComandaClosing(true)
+    setTimeout(() => {
+      setModalConfirmarComanda(false)
+      setModalConfirmarComandaClosing(false)
+      setNomeComanda('')
+      setModalNomeComandaClosing(false)
+      setModalNomeComanda(true)
+    }, 160)
+  }
+
+  const fecharConfirmarComanda = () => {
+    setModalConfirmarComandaClosing(true)
+    setTimeout(() => {
+      setModalConfirmarComanda(false)
+      setModalConfirmarComandaClosing(false)
+    }, 160)
+  }
+
+  const fecharNomeComanda = () => {
+    setModalNomeComandaClosing(true)
+    setTimeout(() => {
+      setModalNomeComanda(false)
+      setModalNomeComandaClosing(false)
+    }, 160)
+  }
+
+  const fecharSelecionarComanda = () => {
+    setModalSelecionarComandaClosing(true)
+    setTimeout(() => {
+      setModalSelecionarComanda(false)
+      setModalSelecionarComandaClosing(false)
+    }, 160)
   }
 
   const criarComanda = async () => {
@@ -285,7 +389,23 @@ export function GarcomPage() {
     }
   }
 
-  const fecharComanda = async (comandaId: number) => {
+  const abrirModalFecharComanda = (comanda: Comanda) => {
+    setModalFecharComandaClosing(false)
+    setModalFecharComanda(comanda)
+  }
+
+  const fecharModalFecharComanda = () => {
+    setModalFecharComandaClosing(true)
+    setTimeout(() => {
+      setModalFecharComanda(null)
+      setModalFecharComandaClosing(false)
+    }, 160)
+  }
+
+  const confirmarFecharComanda = async () => {
+    if (!modalFecharComanda) return
+    const comandaId = modalFecharComanda.id
+    fecharModalFecharComanda()
     try {
       await api.post(`/comandas/${comandaId}/fechar`)
       toast.success('Comanda fechada!')
@@ -297,19 +417,40 @@ export function GarcomPage() {
   }
 
   const selecionarMesa = async (mesa: Mesa) => {
-    setMesaSelecionada(mesa)
-    await carregarComandas(mesa.id)
+    if (viewTransition !== 'idle') return
+    setViewTransition('mesas-exit')
+    const openMesa = async () => {
+      await carregarComandas(mesa.id)
+      setMesaSelecionada(mesa)
+      setViewTransition('idle')
+    }
+    if (import.meta.env.MODE === 'test') {
+      void openMesa()
+      return
+    }
+    setTimeout(() => { void openMesa() }, 180)
   }
 
   const voltarParaMesas = async () => {
-    setMesaSelecionada(null)
-    setCart([])
-    setMostrarCart(false)
-    await carregarMesas()
+    if (viewTransition !== 'idle') return
+    setViewTransition('mesa-exit')
+    const backToMesas = async () => {
+      setMesaSelecionada(null)
+      setCart([])
+      setMostrarCart(false)
+      await carregarMesas()
+      setViewTransition('idle')
+    }
+    if (import.meta.env.MODE === 'test') {
+      void backToMesas()
+      return
+    }
+    setTimeout(() => { void backToMesas() }, 180)
   }
 
   const itensFiltrados = catFiltro !== null ? itens.filter(i => i.categoriaId === catFiltro) : itens
   const catIdx = (catId: number) => categorias.findIndex(c => c.id === catId)
+  const totalComandasAbertas = comandas.reduce((total, comanda) => total + totalComanda(comanda), 0)
 
   // ── Pedidos helpers ─────────────────────────────────────────────
   // Use frontend category state as source of truth for cozinhar
@@ -352,7 +493,7 @@ export function GarcomPage() {
 
   // ── Bottom nav (shared) ─────────────────────────────────────────
   const BottomNav = () => (
-    <nav className="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-6 pt-2 z-50"
+    <nav className="fixed bottom-0 left-0 w-full flex justify-around md:justify-center items-center gap-2 md:gap-20 px-4 md:px-10 pb-6 md:pb-4 pt-2 md:pt-3 z-50"
       style={{ background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(16px)', borderTop: '1px solid #e6e8ee', boxShadow: '0 -4px 12px rgba(185,0,20,0.04)' }}>
       <button
         onClick={() => setAbaTopLevel('pedidos')}
@@ -398,7 +539,7 @@ export function GarcomPage() {
   // ── Mesa detail view ────────────────────────────────────────────
   if (mesaSelecionada) {
     return (
-      <div className="min-h-screen" style={{ background: '#f7f9ff', fontFamily: 'Inter, sans-serif', color: '#191c20' }}>
+      <div className={`view-panel view-panel-forward min-h-screen ${viewTransition === 'mesa-exit' ? 'view-panel-exit-back' : ''}`} style={{ background: '#f7f9ff', fontFamily: 'Inter, sans-serif', color: '#191c20' }}>
 
         <header className="fixed top-0 w-full z-50 flex justify-between items-center px-4 h-16"
           style={{ background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(12px)', boxShadow: '0 1px 0 #e6e8ee' }}>
@@ -412,7 +553,7 @@ export function GarcomPage() {
               Mesa {mesaSelecionada.numero}
             </h1>
           </div>
-          <button onClick={() => setModalConfirmarComanda(true)}
+          <button onClick={() => { setModalConfirmarComandaClosing(false); setModalConfirmarComanda(true) }}
             className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold active:scale-95 transition-all"
             style={{ background: '#b90014', color: '#ffffff' }}>
             <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>add</span>
@@ -421,6 +562,22 @@ export function GarcomPage() {
         </header>
 
         <main className="pt-20 pb-40 px-4 space-y-8 max-w-lg mx-auto">
+          <section className="grid grid-cols-2 gap-3 motion-list">
+            <div className="rounded-2xl p-4" style={{ background: '#ffffff', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+              <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#926e6b' }}>
+                Comandas abertas
+              </p>
+              <p className="mt-1 text-2xl font-black" style={{ color: '#191c20' }}>{comandas.length}</p>
+            </div>
+            <div className="rounded-2xl p-4" style={{ background: '#ffffff', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+              <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#926e6b' }}>
+                Total parcial
+              </p>
+              <p className="mt-1 text-2xl font-black" style={{ color: '#b90014' }}>
+                {formatCurrencyBRL(totalComandasAbertas)}
+              </p>
+            </div>
+          </section>
 
           {/* Comandas abertas */}
           {comandas.length > 0 && (
@@ -434,9 +591,7 @@ export function GarcomPage() {
                 </span>
               </div>
               {comandas.map((comanda, idx) => {
-                const totalComanda = comanda.pedidos
-                  .flatMap(p => p.itens)
-                  .reduce((a, i) => a + i.itemPreco * i.quantidade, 0)
+                const total = totalComanda(comanda)
                 const isGeral = comanda.nome === 'Geral'
                 return (
                   <div key={comanda.id}
@@ -452,10 +607,10 @@ export function GarcomPage() {
                       </p>
                       <h3 className="text-lg font-extrabold" style={{ color: '#191c20' }}>{comanda.nome}</h3>
                     </div>
-                    <button onClick={() => fecharComanda(comanda.id)}
+                    <button onClick={() => abrirModalFecharComanda(comanda)}
                       className="px-4 py-2.5 rounded-lg text-sm font-bold text-white flex items-center gap-2 active:scale-95 transition-all"
                       style={{ background: '#428057' }}>
-                      Fechar — R$ {totalComanda.toFixed(2).replace('.', ',')}
+                      Fechar - {formatCurrencyBRL(total)}
                     </button>
                   </div>
                 )
@@ -487,7 +642,7 @@ export function GarcomPage() {
                 {categorias.map(cat => (
                   <button key={cat.id}
                     onClick={() => { if (!drag.current.moved) setCatFiltro(cat.id) }}
-                    className="whitespace-nowrap px-5 py-2 rounded-full text-sm font-bold flex-shrink-0 transition-all active:scale-95"
+                    className="filter-pill whitespace-nowrap px-5 py-2 rounded-full text-sm font-bold flex-shrink-0"
                     style={catFiltro === cat.id
                       ? { background: '#b90014', color: '#ffffff', boxShadow: '0 2px 8px rgba(185,0,20,0.25)' }
                       : { background: '#eceef4', color: '#5d3f3c' }}>
@@ -508,25 +663,26 @@ export function GarcomPage() {
                 Nenhum item nesta categoria.
               </p>
             ) : (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3 motion-list">
                 {itensFiltrados.map(item => {
-                  const idx = catIdx(item.categoriaId)
+                  const idx = Math.max(catIdx(item.categoriaId), 0)
+                  const categoria = categorias.find(c => c.id === item.categoriaId)
                   const gradient = CAT_GRADIENTS[idx % CAT_GRADIENTS.length]
-                  const icon = CAT_ICONS[idx % CAT_ICONS.length]
+                  const icon = categoryIcon(categoria?.nome ?? item.categoriaNome)
                   const iconColor = CAT_ICON_COLORS[idx % CAT_ICON_COLORS.length]
                   const inCart = cart.find(c => c.itemId === item.id)
                   return (
                     <div key={item.id}
-                      className="rounded-2xl overflow-hidden transition-transform active:scale-[0.98]"
+                      className="interactive-card rounded-2xl overflow-hidden"
                       style={{
                         background: '#ffffff',
                         boxShadow: '0 1px 4px rgba(0,0,0,0.07)',
                         opacity: item.disponivel ? 1 : 0.45,
                       }}>
-                      <div className="h-28 w-full flex items-center justify-center relative overflow-hidden"
+                      <div className="image-frame h-28 w-full flex items-center justify-center relative overflow-hidden"
                         style={{ background: gradient }}>
                         {item.imagemUrl
-                          ? <img src={item.imagemUrl} alt={item.nome} className="w-full h-full object-cover" />
+                          ? <img src={item.imagemUrl} alt={item.nome} loading="lazy" decoding="async" className="smooth-image w-full h-full object-cover" />
                           : <span className="material-symbols-outlined" style={{ fontSize: '3rem', color: iconColor, opacity: 0.6 }}>{icon}</span>
                         }
                         {!item.disponivel && (
@@ -540,7 +696,7 @@ export function GarcomPage() {
                         <div className="flex justify-between items-start gap-1">
                           <h4 className="font-bold text-sm leading-tight" style={{ color: '#191c20' }}>{item.nome}</h4>
                           <span className="font-bold text-xs flex-shrink-0" style={{ color: '#b90014' }}>
-                            R$ {item.preco.toFixed(2).replace('.', ',')}
+                            {formatCurrencyBRL(item.preco)}
                           </span>
                         </div>
                         {inCart ? (
@@ -574,7 +730,7 @@ export function GarcomPage() {
         {cart.length > 0 && (
           <div className="fixed bottom-0 left-0 w-full p-3 z-50">
             {mostrarCart && (
-              <div className="mb-2 rounded-3xl overflow-hidden"
+              <div className="tab-panel mb-2 rounded-3xl overflow-hidden"
                 style={{ background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(16px)', boxShadow: '0 -4px 24px rgba(185,0,20,0.08)' }}>
                 <div className="px-4 pt-4 pb-2 max-h-52 overflow-y-auto">
                   {cart.map(c => (
@@ -590,7 +746,7 @@ export function GarcomPage() {
                           className="w-8 h-8 rounded-full flex items-center justify-center text-lg font-bold"
                           style={{ background: '#f2f3f9', color: '#5d3f3c' }}>+</button>
                         <span className="text-xs w-16 text-right font-semibold" style={{ color: '#926e6b' }}>
-                          R$ {(c.preco * c.quantidade).toFixed(2).replace('.', ',')}
+                          {formatCurrencyBRL(c.preco * c.quantidade)}
                         </span>
                       </div>
                     </div>
@@ -615,7 +771,7 @@ export function GarcomPage() {
                 <div className="flex items-center gap-3">
                   <div className="w-px h-6" style={{ background: 'rgba(255,255,255,0.2)' }} />
                   <span className="font-black text-lg text-white">
-                    R$ {totalCart.toFixed(2).replace('.', ',')}
+                    {formatCurrencyBRL(totalCart)}
                   </span>
                 </div>
               </button>
@@ -625,9 +781,9 @@ export function GarcomPage() {
 
         {/* Modal — confirmar criar comanda */}
         {modalConfirmarComanda && (
-          <div className="fixed inset-0 flex items-center justify-center z-50 p-4"
+          <div className={`modal-backdrop fixed inset-0 flex items-center justify-center z-50 p-4 ${modalConfirmarComandaClosing ? 'modal-exit' : ''}`}
             style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}>
-            <div className="bg-white rounded-2xl p-6 w-full max-w-sm"
+            <div className="modal-surface bg-white rounded-2xl p-6 w-full max-w-sm"
               style={{ boxShadow: '0 32px 64px rgba(185,0,20,0.12)' }}>
               <h3 className="text-lg font-bold mb-2 text-center">Criar nova comanda?</h3>
               <p className="text-sm text-center mb-6" style={{ color: '#926e6b' }}>
@@ -639,8 +795,8 @@ export function GarcomPage() {
                   style={{ background: 'linear-gradient(135deg, #b90014, #d4001a)' }}>
                   Continuar
                 </button>
-                <button onClick={() => setModalConfirmarComanda(false)}
-                  className="w-full py-3 rounded-xl font-semibold"
+                <button onClick={fecharConfirmarComanda}
+                  className="modal-cancel w-full py-3 rounded-xl font-semibold"
                   style={{ border: '2px solid #e6e8ee', color: '#5d3f3c' }}>
                   Cancelar
                 </button>
@@ -651,9 +807,9 @@ export function GarcomPage() {
 
         {/* Modal — nome da comanda */}
         {modalNomeComanda && (
-          <div className="fixed inset-0 flex items-center justify-center z-50 p-4"
+          <div className={`modal-backdrop fixed inset-0 flex items-center justify-center z-50 p-4 ${modalNomeComandaClosing ? 'modal-exit' : ''}`}
             style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}>
-            <div className="bg-white rounded-2xl p-6 w-full max-w-sm"
+            <div className="modal-surface bg-white rounded-2xl p-6 w-full max-w-sm"
               style={{ boxShadow: '0 32px 64px rgba(185,0,20,0.12)' }}>
               <h3 className="text-lg font-bold mb-1 text-center">Nome da comanda</h3>
               <p className="text-sm text-center mb-4" style={{ color: '#926e6b' }}>Informe o nome do cliente.</p>
@@ -668,8 +824,8 @@ export function GarcomPage() {
                   style={{ background: 'linear-gradient(135deg, #b90014, #d4001a)' }}>
                   Criar
                 </button>
-                <button onClick={() => setModalNomeComanda(false)}
-                  className="w-full py-3 rounded-xl font-semibold"
+                <button onClick={fecharNomeComanda}
+                  className="modal-cancel w-full py-3 rounded-xl font-semibold"
                   style={{ border: '2px solid #e6e8ee', color: '#5d3f3c' }}>
                   Cancelar
                 </button>
@@ -680,9 +836,9 @@ export function GarcomPage() {
 
         {/* Modal — selecionar comanda */}
         {modalSelecionarComanda && (
-          <div className="fixed inset-0 flex items-center justify-center z-50 p-4"
+          <div className={`modal-backdrop fixed inset-0 flex items-center justify-center z-50 p-4 ${modalSelecionarComandaClosing ? 'modal-exit' : ''}`}
             style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}>
-            <div className="bg-white rounded-2xl p-6 w-full max-w-sm"
+            <div className="modal-surface bg-white rounded-2xl p-6 w-full max-w-sm"
               style={{ boxShadow: '0 32px 64px rgba(185,0,20,0.12)' }}>
               <h3 className="text-lg font-bold mb-1 text-center">Para qual comanda?</h3>
               <p className="text-sm text-center mb-4" style={{ color: '#926e6b' }}>
@@ -705,10 +861,35 @@ export function GarcomPage() {
                   </button>
                 ))}
               </div>
-              <button onClick={() => setModalSelecionarComanda(false)}
-                className="w-full py-2 text-sm font-medium" style={{ color: '#926e6b' }}>
+              <button onClick={fecharSelecionarComanda}
+                className="modal-cancel w-full py-2 rounded-xl text-sm font-medium" style={{ color: '#926e6b' }}>
                 Cancelar
               </button>
+            </div>
+          </div>
+        )}
+
+        {modalFecharComanda && (
+          <div className={`modal-backdrop fixed inset-0 flex items-center justify-center z-50 p-4 ${modalFecharComandaClosing ? 'modal-exit' : ''}`}
+            style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}>
+            <div className="modal-surface bg-white rounded-2xl p-6 w-full max-w-sm"
+              style={{ boxShadow: '0 32px 64px rgba(185,0,20,0.12)' }}>
+              <h3 className="text-lg font-bold mb-2 text-center">Fechar comanda?</h3>
+              <p className="text-sm text-center mb-6" style={{ color: '#926e6b' }}>
+                {modalFecharComanda.nome} será fechada com total de {formatCurrencyBRL(totalComanda(modalFecharComanda))}.
+              </p>
+              <div className="flex gap-3">
+                <button onClick={fecharModalFecharComanda}
+                  className="modal-cancel flex-1 py-3 rounded-xl font-semibold"
+                  style={{ border: '1.5px solid #e6e8ee', color: '#5d3f3c' }}>
+                  Cancelar
+                </button>
+                <button onClick={confirmarFecharComanda}
+                  className="flex-1 py-3 rounded-xl font-semibold text-white"
+                  style={{ background: 'linear-gradient(135deg, #428057, #2f6f45)' }}>
+                  Fechar
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -722,7 +903,7 @@ export function GarcomPage() {
     const andamentoPorMesa = agruparPorMesa(itensAndamento)
 
     return (
-      <div className="min-h-screen pb-24" style={{ background: '#f7f9ff', fontFamily: 'Inter, sans-serif', color: '#191c20' }}>
+      <div className="view-panel min-h-screen pb-24" style={{ background: '#f7f9ff', fontFamily: 'Inter, sans-serif', color: '#191c20' }}>
 
         <header className="sticky top-0 z-50 flex items-center justify-between px-4 py-3 w-full"
           style={{ background: '#f2f3f9', boxShadow: '0 1px 0 #e6e8ee' }}>
@@ -732,10 +913,11 @@ export function GarcomPage() {
               Restaurante Digital
             </h1>
           </div>
-          <button onClick={carregarPedidos}
-            className="p-2 rounded-full transition-colors active:scale-95"
+          <button onClick={() => carregarPedidos({ force: true })}
+            disabled={carregandoPedidos}
+            className="p-2 rounded-full transition-colors active:scale-95 disabled:opacity-60"
             style={{ color: '#926e6b' }}>
-            <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>refresh</span>
+            <span className={`material-symbols-outlined ${carregandoPedidos ? 'animate-spin' : ''}`} style={{ fontSize: '1.25rem' }}>refresh</span>
           </button>
         </header>
 
@@ -744,6 +926,9 @@ export function GarcomPage() {
             <h2 className="text-3xl font-extrabold tracking-tight mb-1">Pedidos</h2>
             <p className="text-sm font-medium" style={{ color: '#926e6b' }}>
               {user?.nome} • {itensFlat.length} {itensFlat.length === 1 ? 'item' : 'itens'} ativos
+            </p>
+            <p className="mt-1 text-xs font-semibold" style={{ color: carregandoPedidos ? '#b90014' : '#926e6b' }}>
+              {carregandoPedidos ? 'Atualizando pedidos...' : formatUpdatedAt(pedidosAtualizadosEm, agora)}
             </p>
           </div>
 
@@ -775,7 +960,7 @@ export function GarcomPage() {
                   </div>
 
                   {prontosPorMesa.map(({ mesaNumero, items }) => (
-                    <div key={mesaNumero} className="rounded-2xl overflow-hidden"
+                    <div key={mesaNumero} className="ready-card rounded-2xl overflow-hidden"
                       style={{ background: '#ffffff', boxShadow: '0 1px 4px rgba(0,0,0,0.07)', borderLeft: '4px solid #428057' }}>
                       {/* Mesa header */}
                       <div className="flex items-center justify-between px-4 py-3"
@@ -795,7 +980,8 @@ export function GarcomPage() {
                       {/* Items */}
                       <div className="divide-y" style={{ borderColor: '#f2f3f9' }}>
                         {items.map(item => (
-                          <div key={item.id} className="flex items-center justify-between px-4 py-3 gap-3">
+                          <div key={item.id}
+                            className={`flex items-center justify-between px-4 py-3 gap-3 ${itensRecemProntos.includes(item.id) ? 'ready-highlight' : ''}`}>
                             <div className="flex items-center gap-3 flex-1 min-w-0">
                               <span className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 font-black text-xs"
                                 style={{ background: '#dcfce7', color: '#166534' }}>
@@ -897,7 +1083,7 @@ export function GarcomPage() {
   // ── Top-level: Perfil tab ──────────────────────────────────────
   if (abaTopLevel === 'perfil') {
     return (
-      <div className="min-h-screen pb-24" style={{ background: '#f7f9ff', fontFamily: 'Inter, sans-serif', color: '#191c20' }}>
+      <div className="view-panel min-h-screen pb-24" style={{ background: '#f7f9ff', fontFamily: 'Inter, sans-serif', color: '#191c20' }}>
         <header className="sticky top-0 z-50 flex items-center justify-between px-4 py-3 w-full"
           style={{ background: '#f2f3f9', boxShadow: '0 1px 0 #e6e8ee' }}>
           <div className="flex items-center gap-3">
@@ -908,7 +1094,7 @@ export function GarcomPage() {
           </div>
         </header>
 
-        <main className="px-4 pt-6 pb-4 max-w-lg mx-auto space-y-4">
+        <main className="px-4 pt-6 pb-4 max-w-lg mx-auto space-y-4 motion-list">
           <div className="mb-2">
             <h2 className="text-3xl font-extrabold tracking-tight mb-1">Perfil</h2>
             <p className="text-sm font-medium" style={{ color: '#926e6b' }}>{user?.nome}</p>
@@ -964,12 +1150,23 @@ export function GarcomPage() {
   // ── Top-level: Mesas tab ────────────────────────────────────────
   const livres = mesas.filter(m => m.status === 0)
   const ocupadas = mesas.filter(m => m.status === 1)
-  const mesasFiltradas = filtroMesa === 'livres' ? livres : filtroMesa === 'ocupadas' ? ocupadas : mesas
+  const mesasPorStatus = filtroMesa === 'livres' ? livres : filtroMesa === 'ocupadas' ? ocupadas : mesas
+  const termoMesa = buscaMesa.trim().replace(/^0+(?=\d)/, '')
+  const mesasFiltradas = mesasPorStatus.filter(m => {
+    if (!termoMesa) return true
+    const numero = String(m.numero)
+    const numeroComZero = numero.padStart(2, '0')
+    return numero.includes(termoMesa) || numeroComZero.includes(buscaMesa.trim())
+  })
+  const prontosPorMesaMap = itensProntos.reduce<Record<number, number>>((acc, item) => {
+    acc[item.mesaNumero] = (acc[item.mesaNumero] ?? 0) + 1
+    return acc
+  }, {})
 
   return (
-    <div className="min-h-screen pb-24" style={{ background: '#f7f9ff', fontFamily: 'Inter, sans-serif', color: '#191c20' }}>
+    <div className={`view-panel view-panel-back min-h-screen pb-24 ${viewTransition === 'mesas-exit' ? 'view-panel-exit-forward' : ''}`} style={{ background: '#f7f9ff', fontFamily: 'Inter, sans-serif', color: '#191c20' }}>
 
-      <header className="sticky top-0 z-50 flex items-center justify-between px-4 py-3 w-full"
+      <header className="sticky top-0 z-50 flex items-center justify-between px-4 md:px-10 lg:px-12 py-3 md:py-4 w-full"
         style={{ background: '#f2f3f9', boxShadow: '0 1px 0 #e6e8ee' }}>
         <div className="flex items-center gap-3">
           <span className="material-symbols-outlined" style={{ color: '#b90014', fontSize: '1.5rem' }}>restaurant</span>
@@ -980,7 +1177,7 @@ export function GarcomPage() {
         <div className="w-10" />
       </header>
 
-      <main className="px-4 pt-6 pb-4 max-w-lg mx-auto">
+      <main className="px-4 md:px-8 lg:px-12 pt-6 md:pt-10 pb-4 max-w-lg md:max-w-5xl lg:max-w-6xl mx-auto">
         <div className="mb-6">
           <h2 className="text-3xl font-extrabold tracking-tight mb-1">Visão de Mesas</h2>
           <p className="text-sm font-medium" style={{ color: '#926e6b' }}>
@@ -996,7 +1193,7 @@ export function GarcomPage() {
             { key: 'ocupadas', label: `Ocupada (${ocupadas.length})` },
           ] as const).map(f => (
             <button key={f.key} onClick={() => setFiltroMesa(f.key)}
-              className="whitespace-nowrap px-5 py-2.5 rounded-full text-sm font-semibold flex-shrink-0 transition-all active:scale-95"
+              className="filter-pill whitespace-nowrap px-5 py-2.5 rounded-full text-sm font-semibold flex-shrink-0"
               style={filtroMesa === f.key
                 ? { background: '#b90014', color: '#ffffff', boxShadow: '0 2px 8px rgba(185,0,20,0.25)' }
                 : { background: '#e6e8ee', color: '#191c20' }}>
@@ -1005,15 +1202,40 @@ export function GarcomPage() {
           ))}
         </div>
 
+        <label className="mb-6 flex items-center gap-3 rounded-2xl px-4 py-3"
+          style={{ background: '#ffffff', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid #e6e8ee' }}>
+          <span className="material-symbols-outlined" style={{ color: '#926e6b', fontSize: '1.25rem' }}>search</span>
+          <input
+            value={buscaMesa}
+            onChange={e => setBuscaMesa(e.target.value.replace(/\D/g, ''))}
+            inputMode="numeric"
+            placeholder="Buscar mesa pelo número"
+            className="min-w-0 flex-1 bg-transparent text-sm font-semibold outline-none"
+            style={{ color: '#191c20' }}
+          />
+          {buscaMesa && (
+            <button type="button" onClick={() => setBuscaMesa('')}
+              className="h-7 w-7 rounded-full flex items-center justify-center transition-colors"
+              style={{ background: '#f2f3f9', color: '#5d3f3c' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>close</span>
+            </button>
+          )}
+        </label>
+
         {mesas.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20" style={{ color: '#926e6b' }}>
             <span className="material-symbols-outlined mb-3" style={{ fontSize: '3rem' }}>table_restaurant</span>
             <p className="text-sm font-medium">Nenhuma mesa cadastrada.</p>
           </div>
+        ) : mesasFiltradas.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20" style={{ color: '#926e6b' }}>
+            <span className="material-symbols-outlined mb-3" style={{ fontSize: '3rem' }}>search_off</span>
+            <p className="text-sm font-medium">Nenhuma mesa encontrada.</p>
+          </div>
         ) : (
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
             {filtroMesa === 'todas' && mesas.length > 0 && (
-              <div className="col-span-2 p-5 rounded-xl overflow-hidden relative"
+              <div className="col-span-2 md:col-span-3 lg:col-span-4 p-5 md:p-6 rounded-xl overflow-hidden relative"
                 style={{ background: '#b90014', minHeight: '6rem' }}>
                 <span className="material-symbols-outlined absolute right-3 bottom-[-8px] opacity-20"
                   style={{ fontSize: '6rem', color: '#fff', transform: 'rotate(-12deg)' }}>
@@ -1036,13 +1258,14 @@ export function GarcomPage() {
 
             {mesasFiltradas.sort((a, b) => a.numero - b.numero).map(m => {
               const ocupada = m.status === 1
+              const prontos = prontosPorMesaMap[m.numero] ?? 0
               return (
                 <button key={m.id} onClick={() => selecionarMesa(m)}
-                  className="relative text-left p-5 rounded-xl overflow-hidden transition-transform active:scale-95"
+                  className="interactive-card relative text-left p-5 md:p-6 rounded-xl overflow-hidden"
                   style={{
                     background: '#ffffff',
                     boxShadow: '0 1px 4px rgba(0,0,0,0.07)',
-                    borderLeft: `6px solid ${ocupada ? '#b90014' : '#428057'}`,
+                    borderLeft: `6px solid ${prontos > 0 ? '#428057' : ocupada ? '#b90014' : '#428057'}`,
                   }}>
                   <div className="flex justify-between items-start mb-4">
                     <span className="text-xs font-bold uppercase tracking-widest"
@@ -1052,10 +1275,10 @@ export function GarcomPage() {
                     <span className="material-symbols-outlined"
                       style={{
                         fontSize: '1.125rem',
-                        color: ocupada ? '#b90014' : '#428057',
+                        color: prontos > 0 ? '#428057' : ocupada ? '#b90014' : '#428057',
                         fontVariationSettings: "'FILL' 1",
                       }}>
-                      {ocupada ? 'receipt_long' : 'add_circle'}
+                      {prontos > 0 ? 'notifications_active' : ocupada ? 'receipt_long' : 'add_circle'}
                     </span>
                   </div>
                   <div className="mb-5">
@@ -1074,6 +1297,12 @@ export function GarcomPage() {
                       {ocupada ? 'Em atendimento' : 'Disponível'}
                     </span>
                   </div>
+                  {prontos > 0 && (
+                    <div className="mt-3 rounded-lg px-2 py-1.5 text-center text-[10px] font-black uppercase tracking-widest"
+                      style={{ background: '#e9f7ee', color: '#2f6f45' }}>
+                      {prontos} pronto{prontos > 1 ? 's' : ''} para entregar
+                    </div>
+                  )}
                 </button>
               )
             })}
@@ -1085,3 +1314,4 @@ export function GarcomPage() {
     </div>
   )
 }
+

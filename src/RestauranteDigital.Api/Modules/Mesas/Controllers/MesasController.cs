@@ -15,7 +15,27 @@ namespace RestauranteDigital.Api.Modules.Mesas.Controllers;
 public class MesasController(AppDbContext db, IConfiguration config, IHubContext<RestauranteHub> hub) : ControllerBase
 {
     private string GetMenuUrl(string token) =>
-        $"{config["App:BaseUrl"] ?? "http://localhost:5173"}/menu/{token}";
+        $"{config["App:FrontendUrl"] ?? "http://localhost:5173"}/menu/{token}";
+
+    private string GetQrPageUrl(string token) =>
+        $"{config["App:FrontendUrl"] ?? "http://localhost:5173"}/qr/{token}";
+
+    private string GetQrImageUrl(string token) =>
+        $"/api/mesas/token/{token}/qrcode";
+
+    private MesaPublicQrResponse ToPublicQrResponse(Mesa mesa) =>
+        new(mesa.Numero, mesa.QrCodeToken, GetMenuUrl(mesa.QrCodeToken), GetQrImageUrl(mesa.QrCodeToken), GetQrPageUrl(mesa.QrCodeToken));
+
+    private FileContentResult CreateQrCodeFile(string url, string? fileName = null)
+    {
+        using var qrGenerator = new QRCodeGenerator();
+        var qrData = qrGenerator.CreateQrCode(url, QRCodeGenerator.ECCLevel.Q);
+        using var qrCode = new PngByteQRCode(qrData);
+        var bytes = qrCode.GetGraphic(20);
+        return fileName is null
+            ? File(bytes, "image/png")
+            : File(bytes, "image/png", fileName);
+    }
 
     [HttpGet]
     [Authorize(Roles = "Admin,Garcom,Gerente")]
@@ -29,12 +49,31 @@ public class MesasController(AppDbContext db, IConfiguration config, IHubContext
             new MesaResponse(m.Id, m.Numero, m.QrCodeToken, m.Status, GetMenuUrl(m.QrCodeToken))));
     }
 
+    [HttpGet("public")]
+    public async Task<IActionResult> GetPublicQrs()
+    {
+        var mesas = await db.Mesas
+            .OrderBy(m => m.Numero)
+            .ToListAsync();
+
+        return Ok(mesas.Select(ToPublicQrResponse));
+    }
+
     [HttpGet("token/{token}")]
     public async Task<IActionResult> GetByToken(string token)
     {
         var mesa = await db.Mesas.FirstOrDefaultAsync(m => m.QrCodeToken == token);
         if (mesa is null) return NotFound();
         return Ok(new MesaResponse(mesa.Id, mesa.Numero, mesa.QrCodeToken, mesa.Status, GetMenuUrl(mesa.QrCodeToken)));
+    }
+
+    [HttpGet("token/{token}/qrcode")]
+    public async Task<IActionResult> GetQrCodeByToken(string token)
+    {
+        var mesa = await db.Mesas.FirstOrDefaultAsync(m => m.QrCodeToken == token);
+        if (mesa is null) return NotFound();
+
+        return CreateQrCodeFile(GetMenuUrl(mesa.QrCodeToken));
     }
 
     [HttpGet("{id}/qrcode")]
@@ -45,11 +84,7 @@ public class MesasController(AppDbContext db, IConfiguration config, IHubContext
         if (mesa is null) return NotFound();
 
         var url = GetMenuUrl(mesa.QrCodeToken);
-        using var qrGenerator = new QRCodeGenerator();
-        var qrData = qrGenerator.CreateQrCode(url, QRCodeGenerator.ECCLevel.Q);
-        using var qrCode = new PngByteQRCode(qrData);
-        var bytes = qrCode.GetGraphic(20);
-        return File(bytes, "image/png", $"mesa-{mesa.Numero}-qr.png");
+        return CreateQrCodeFile(url, $"mesa-{mesa.Numero}-qr.png");
     }
 
     [HttpPost]

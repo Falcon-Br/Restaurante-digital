@@ -24,6 +24,7 @@ public class KdsController(AppDbContext db, IHubContext<RestauranteHub> hub) : C
             .Where(pi => pi.Status != PedidoItemStatus.Pronto
                       && pi.Status != PedidoItemStatus.Entregue
                       && pi.Pedido.Status == PedidoStatus.Aberto
+                      && pi.Item.Disponivel
                       && pi.Item.Categoria.Cozinhar)
             .OrderBy(pi => pi.CriadoEm)
             .ToListAsync();

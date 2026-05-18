@@ -11,7 +11,7 @@ vi.mock('../../api/client', () => ({
   api: { get: vi.fn() },
 }))
 
-vi.mock('../../context/AuthContext', () => ({
+vi.mock('../../context/useAuth', () => ({
   useAuth: vi.fn(() => ({ logout: vi.fn() })),
 }))
 

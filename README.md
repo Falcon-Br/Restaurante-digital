@@ -78,6 +78,16 @@ Aguarde o build (~2 min na primeira vez). Quando estiver pronto:
 
 O banco é criado e as migrations são aplicadas automaticamente no startup.
 
+### Rotas principais para navegação
+
+| Público / Perfil | URL | Uso |
+|------------------|-----|-----|
+| Apresentação pública | http://localhost:3000/ | Página inicial para entender o produto e acessar a demo |
+| Login interno | http://localhost:3000/login | Entrada dos perfis Admin, Garçom, Cozinha e Gerente |
+| Cardápio do cliente | http://localhost:3000/menu/{token-da-mesa} | Link público usado no QR Code de cada mesa |
+
+O cardápio do cliente não exige login. O mesmo endereço gerado para a mesa pode ser aberto por QR Code ou compartilhado como link direto.
+
 ### Usuários de teste (criados automaticamente)
 
 | Perfil    | Email                   | Senha  |
@@ -117,6 +127,12 @@ npm run dev
 # Frontend disponível em http://localhost:5173
 ```
 
+Para validar o build local de produção:
+
+```bash
+npm run build
+```
+
 ### Testes
 
 ```bash
@@ -134,8 +150,8 @@ dotnet test
 | `Jwt__Secret`                   | Chave secreta para assinar tokens JWT  | string longa e aleatória       |
 | `Jwt__Issuer`                   | Issuer do JWT                          | `RestauranteDigital`           |
 | `Jwt__Audience`                 | Audience do JWT                        | `RestauranteDigital`           |
-| `App__BaseUrl`                  | URL pública da API (usada no QR Code)  | `https://api.seudominio.com`   |
-| `App__FrontendUrl`              | URL pública do frontend (CORS)         | `https://seudominio.com`       |
+| `App__BaseUrl`                  | URL pública da API                     | `https://api.seudominio.com`   |
+| `App__FrontendUrl`              | URL pública do frontend (CORS e QR Code) | `https://seudominio.com`     |
 
 > **Importante:** em produção, troque o `Jwt__Secret` do `docker-compose.yml` por uma string forte e única.
 
@@ -179,3 +195,29 @@ restaurante-digital/
 ## Licença
 
 MIT
+
+---
+
+## Projeto de portfolio
+
+Este projeto foi criado como uma demonstracao full stack de um fluxo real de restaurante: o cliente faz o pedido pelo cardapio digital, a cozinha recebe a demanda em tempo real, o garcom acompanha mesas e comandas, e o gerente consulta resultados operacionais.
+
+O sistema pode ser usado como demo navegavel. Ao subir o ambiente, a tela de login oferece atalhos para entrar como Admin, Garcom, Cozinha ou Gerente sem digitar as credenciais manualmente.
+
+### O que este projeto demonstra
+
+- Backend modular com ASP.NET Core, EF Core, Identity, JWT e SignalR.
+- Frontend React com TypeScript, rotas protegidas e telas por perfil.
+- Banco PostgreSQL com migrations e dados de demonstracao.
+- Comunicacao em tempo real entre pedidos, cozinha, mesas e relatorios.
+- Testes automatizados no backend.
+- Ambiente local reproduzivel com Docker Compose.
+
+### Fluxo sugerido para testar ou gravar video
+
+1. Entrar como Admin e revisar cardapio/mesas.
+2. Acessar um cardapio publico de mesa por QR Code/link.
+3. Enviar um pedido como cliente.
+4. Entrar como Cozinha e marcar itens como prontos ou esgotados.
+5. Entrar como Garcom e acompanhar mesas/comandas.
+6. Entrar como Gerente e revisar relatorios e historico.

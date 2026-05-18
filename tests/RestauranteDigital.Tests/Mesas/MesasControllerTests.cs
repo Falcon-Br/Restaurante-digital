@@ -55,6 +55,43 @@ public class MesasControllerTests : TestBase
     }
 
     [Fact]
+    public async Task GetQrCodeByToken_ValidToken_ReturnsPngWithoutAuth()
+    {
+        await AuthAsAdmin();
+        var createResp = await Client.PostAsJsonAsync("/api/mesas", new MesaRequest(9));
+        var mesa = await createResp.Content.ReadFromJsonAsync<MesaResponse>();
+
+        Client.DefaultRequestHeaders.Authorization = null;
+        var response = await Client.GetAsync($"/api/mesas/token/{mesa!.QrCodeToken}/qrcode");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.Content.Headers.ContentType!.MediaType.Should().Be("image/png");
+        var bytes = await response.Content.ReadAsByteArrayAsync();
+        bytes.Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public async Task GetPublicQrs_ReturnsMesaListWithoutAuth()
+    {
+        await AuthAsAdmin();
+        await Client.PostAsJsonAsync("/api/mesas", new MesaRequest(2));
+        await Client.PostAsJsonAsync("/api/mesas", new MesaRequest(7));
+
+        Client.DefaultRequestHeaders.Authorization = null;
+        var response = await Client.GetAsync("/api/mesas/public");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var result = await response.Content.ReadFromJsonAsync<List<MesaPublicQrResponse>>();
+        result.Should().NotBeNull();
+        var mesas = result!;
+        mesas.Should().HaveCount(2);
+        mesas[0].Numero.Should().Be(2);
+        mesas[0].QrCodeToken.Should().NotBeNullOrWhiteSpace();
+        mesas[0].QrCodeImageUrl.Should().Contain("/api/mesas/token/");
+        mesas[0].QrPageUrl.Should().Contain("/qr/");
+    }
+
+    [Fact]
     public async Task CreateMesa_DuplicateNumero_Returns400()
     {
         await AuthAsAdmin();

@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../context/useAuth'
+import { api } from '../api/client'
 
 const roleRedirect: Record<string, string> = {
   Garcom: '/garcom',
@@ -11,6 +12,15 @@ const roleRedirect: Record<string, string> = {
   Gerente: '/gerente',
 }
 
+const demoProfiles = [
+  { role: 'Admin', label: 'Admin', email: 'admin@restaurante.com', password: '123456', icon: 'admin_panel_settings' },
+  { role: 'Garcom', label: 'Garcom', email: 'garcom@restaurante.com', password: '123456', icon: 'room_service' },
+  { role: 'Cozinha', label: 'Cozinha', email: 'cozinha@restaurante.com', password: '123456', icon: 'skillet' },
+  { role: 'Gerente', label: 'Gerente', email: 'gerente@restaurante.com', password: '123456', icon: 'monitoring' },
+]
+
+type SystemStatus = 'checking' | 'online' | 'offline'
+
 export function LoginPage() {
   const { login, user } = useAuth()
   const navigate = useNavigate()
@@ -18,12 +28,39 @@ export function LoginPage() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [demoLoading, setDemoLoading] = useState<string | null>(null)
+  const [systemStatus, setSystemStatus] = useState<SystemStatus>('checking')
+  const [lastHealthCheck, setLastHealthCheck] = useState('Verificando agora')
 
   useEffect(() => {
     if (user) {
       navigate(roleRedirect[user.role] ?? '/admin', { replace: true })
     }
   }, [user, navigate])
+
+  useEffect(() => {
+    let active = true
+
+    const checkHealth = async () => {
+      try {
+        await api.get('/health', { timeout: 3500 })
+        if (!active) return
+        setSystemStatus('online')
+        setLastHealthCheck(`Atualizado ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`)
+      } catch {
+        if (!active) return
+        setSystemStatus('offline')
+        setLastHealthCheck('Servidor indisponível')
+      }
+    }
+
+    void checkHealth()
+    const timer = window.setInterval(checkHealth, 30000)
+    return () => {
+      active = false
+      window.clearInterval(timer)
+    }
+  }, [])
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -35,6 +72,39 @@ export function LoginPage() {
       setLoading(false)
     }
   }
+
+  const handleDemoLogin = async (profile: (typeof demoProfiles)[number]) => {
+    setEmail(profile.email)
+    setPassword(profile.password)
+    setDemoLoading(profile.role)
+    try {
+      await login(profile.email, profile.password)
+    } catch {
+      toast.error('Nao foi possivel acessar o perfil demo.')
+      setDemoLoading(null)
+    }
+  }
+
+  const statusContent = {
+    checking: {
+      label: 'Verificando conexão',
+      detail: 'Checando API',
+      color: '#d97706',
+      icon: 'sync',
+    },
+    online: {
+      label: 'Sistema operacional',
+      detail: lastHealthCheck,
+      color: '#428057',
+      icon: 'check_circle',
+    },
+    offline: {
+      label: 'API indisponível',
+      detail: lastHealthCheck,
+      color: '#b90014',
+      icon: 'error',
+    },
+  }[systemStatus]
 
   return (
     <div
@@ -55,7 +125,7 @@ export function LoginPage() {
           className="hidden md:flex flex-col justify-between p-12 relative overflow-hidden"
           style={{ background: '#eceef4' }}
         >
-          <div style={{ position: 'relative', zIndex: 10 }}>
+          <div className="space-y-8" style={{ position: 'relative', zIndex: 10 }}>
             <div className="flex items-center gap-2 mb-8">
               <span
                 className="material-symbols-outlined"
@@ -83,6 +153,61 @@ export function LoginPage() {
                 equipe e receitas em uma única interface.
               </p>
             </div>
+
+            <div
+              className="motion-panel rounded-3xl p-5"
+              style={{
+                background: '#ffffff',
+                border: '1px solid rgba(255,255,255,0.75)',
+                boxShadow: '0 20px 45px rgba(25,28,32,0.08)',
+              }}
+            >
+              <div className="mb-4 flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#926e6b' }}>
+                    Operação ao vivo
+                  </p>
+                  <p className="mt-1 text-sm font-black" style={{ color: '#191c20' }}>
+                    Mesa, cozinha e gestão conectadas
+                  </p>
+                </div>
+                <span
+                  className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest"
+                  style={{ background: '#fff1f2', color: '#b90014' }}
+                >
+                  Live
+                </span>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { value: 'QR', label: 'Cardápio' },
+                  { value: 'KDS', label: 'Cozinha' },
+                  { value: 'BI', label: 'Gerente' },
+                ].map(item => (
+                  <div key={item.label} className="rounded-2xl p-3 text-center" style={{ background: '#f7f9ff' }}>
+                    <p className="text-lg font-black" style={{ color: '#b90014' }}>{item.value}</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#5d3f3c' }}>{item.label}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-4 space-y-2">
+                {[
+                  { table: 'Mesa 08', item: 'Pedido em preparo', tone: '#d97706' },
+                  { table: 'Mesa 03', item: 'Itens prontos', tone: '#428057' },
+                  { table: 'Mesa 12', item: 'Nova comanda', tone: '#b90014' },
+                ].map(row => (
+                  <div key={row.table} className="flex items-center justify-between rounded-xl px-3 py-2" style={{ background: '#f2f3f9' }}>
+                    <span className="text-sm font-black" style={{ color: '#191c20' }}>{row.table}</span>
+                    <span className="flex items-center gap-2 text-xs font-bold" style={{ color: '#5d3f3c' }}>
+                      <span className="h-2 w-2 rounded-full" style={{ background: row.tone }} />
+                      {row.item}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
 
           {/* System status badge */}
@@ -98,28 +223,31 @@ export function LoginPage() {
             >
               <div
                 className="h-10 w-10 flex-shrink-0 flex items-center justify-center"
-                style={{ borderRadius: '9999px', background: '#428057' }}
+                style={{ borderRadius: '9999px', background: statusContent.color }}
               >
                 <span
-                  className="material-symbols-outlined"
+                  className={`material-symbols-outlined ${systemStatus === 'checking' ? 'animate-spin' : ''}`}
                   style={{
                     color: '#ffffff',
                     fontSize: '1.25rem',
                     fontVariationSettings: "'FILL' 1",
                   }}
                 >
-                  check_circle
+                  {statusContent.icon}
                 </span>
               </div>
               <div>
                 <p
                   className="text-xs font-bold uppercase tracking-widest"
-                  style={{ color: '#0e512d' }}
+                  style={{ color: statusContent.color }}
                 >
                   Status do Sistema
                 </p>
                 <p className="text-sm font-medium" style={{ color: '#191c20' }}>
-                  Sistema operacional
+                  {statusContent.label}
+                </p>
+                <p className="text-xs font-semibold" style={{ color: '#926e6b' }}>
+                  {statusContent.detail}
                 </p>
               </div>
             </div>
@@ -272,6 +400,7 @@ export function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(v => !v)}
+                  aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
                   className="absolute inset-y-0 right-0 flex items-center transition-colors"
                   style={{ paddingRight: '1rem', color: '#5d3f3c' }}
                 >
@@ -285,7 +414,7 @@ export function LoginPage() {
             {/* Submit */}
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || demoLoading !== null}
               className="w-full font-bold flex items-center justify-center gap-2 transition-all duration-200 disabled:opacity-60"
               style={{
                 background: 'linear-gradient(135deg, #b90014 0%, #e31b23 100%)',
@@ -306,9 +435,46 @@ export function LoginPage() {
             </button>
           </form>
 
+          <section className="mt-8">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-px flex-1" style={{ background: '#e6e8ee' }} />
+              <span className="text-xs font-bold uppercase tracking-widest" style={{ color: '#926e6b' }}>
+                Acesso demo
+              </span>
+              <div className="h-px flex-1" style={{ background: '#e6e8ee' }} />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              {demoProfiles.map(profile => (
+                <button
+                  key={profile.role}
+                  type="button"
+                  onClick={() => handleDemoLogin(profile)}
+                  disabled={loading || demoLoading !== null}
+                  className="flex items-center gap-2 rounded-xl px-3 py-3 text-left transition-all disabled:opacity-60"
+                  style={{
+                    background: '#f2f3f9',
+                    color: '#191c20',
+                    border: '1px solid #e6e8ee',
+                  }}
+                >
+                  <span className={`material-symbols-outlined ${demoLoading === profile.role ? 'animate-spin' : ''}`} style={{ color: '#b90014', fontSize: '1.25rem' }}>
+                    {demoLoading === profile.role ? 'progress_activity' : profile.icon}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-bold leading-tight">{profile.label}</span>
+                    <span className="block text-[11px] truncate" style={{ color: '#926e6b' }}>
+                      {profile.email}
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </section>
+
           <footer className="mt-12 text-center md:text-left">
             <div
-              className="mt-8 pt-8 flex flex-wrap gap-4 justify-center md:justify-start"
+              className="mt-8 pt-8 flex flex-nowrap items-center gap-3 justify-center md:justify-start whitespace-nowrap"
               style={{ borderTop: '1px solid #e6e8ee' }}
             >
               <span

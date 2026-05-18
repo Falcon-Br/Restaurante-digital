@@ -120,6 +120,8 @@ if (!app.Environment.IsEnvironment("Testing"))
                 await userManager.AddToRoleAsync(user, role);
             }
         }
+
+        await DemoDataSeeder.SeedAsync(db);
     }
 }
 
