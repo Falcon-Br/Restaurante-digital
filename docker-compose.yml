@@ -25,7 +25,7 @@ services:
       Jwt__Issuer: "RestauranteDigital"
       Jwt__Audience: "RestauranteDigital"
       App__BaseUrl: "http://localhost:8080"
-      App__FrontendUrl: "http://localhost:3000"
+      App__FrontendUrl: "https://restaurante.adrio.dev"
       ASPNETCORE_ENVIRONMENT: "Production"
     depends_on:
       db:

@@ -92,6 +92,57 @@ public class MesasControllerTests : TestBase
     }
 
     [Fact]
+    public async Task GetPublicQrs_UsesOriginHeaderAsFrontendUrl()
+    {
+        await AuthAsAdmin();
+        await Client.PostAsJsonAsync("/api/mesas", new MesaRequest(4));
+        Client.DefaultRequestHeaders.Authorization = null;
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/mesas/public");
+        request.Headers.Add("Origin", "https://restaurante.adrio.dev");
+        var response = await Client.SendAsync(request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var mesas = await response.Content.ReadFromJsonAsync<List<MesaPublicQrResponse>>();
+        mesas.Should().ContainSingle();
+        mesas![0].QrCodeUrl.Should().StartWith("https://restaurante.adrio.dev/menu/");
+        mesas[0].QrPageUrl.Should().StartWith("https://restaurante.adrio.dev/qr/");
+    }
+
+    [Fact]
+    public async Task GetPublicQrs_UsesRefererWhenOriginHeaderIsMissing()
+    {
+        await AuthAsAdmin();
+        await Client.PostAsJsonAsync("/api/mesas", new MesaRequest(6));
+        Client.DefaultRequestHeaders.Authorization = null;
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/mesas/public");
+        request.Headers.Referrer = new Uri("http://localhost:5173/home");
+        var response = await Client.SendAsync(request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var mesas = await response.Content.ReadFromJsonAsync<List<MesaPublicQrResponse>>();
+        mesas.Should().ContainSingle();
+        mesas![0].QrCodeUrl.Should().StartWith("http://localhost:5173/menu/");
+        mesas[0].QrPageUrl.Should().StartWith("http://localhost:5173/qr/");
+    }
+
+    [Fact]
+    public async Task GetPublicQrs_WithoutRequestOriginFallsBackToConfiguredLocalFrontend()
+    {
+        await AuthAsAdmin();
+        await Client.PostAsJsonAsync("/api/mesas", new MesaRequest(8));
+        Client.DefaultRequestHeaders.Authorization = null;
+
+        var response = await Client.GetAsync("/api/mesas/public");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var mesas = await response.Content.ReadFromJsonAsync<List<MesaPublicQrResponse>>();
+        mesas.Should().ContainSingle();
+        mesas![0].QrCodeUrl.Should().StartWith("http://localhost:5173/menu/");
+    }
+
+    [Fact]
     public async Task CreateMesa_DuplicateNumero_Returns400()
     {
         await AuthAsAdmin();

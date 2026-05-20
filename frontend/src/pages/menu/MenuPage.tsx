@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { api } from '../../api/client'
 import { useSignalR } from '../../hooks/useSignalR'
@@ -29,6 +29,8 @@ export function MenuPage() {
   const [confirmarPedido, setConfirmarPedido] = useState(false)
   const [modalItemClosing, setModalItemClosing] = useState(false)
   const [confirmarPedidoClosing, setConfirmarPedidoClosing] = useState(false)
+  const catScrollRef = useRef<HTMLDivElement>(null)
+  const catDrag = useRef({ active: false, startX: 0, scrollLeft: 0, moved: false })
 
   useSignalR({
     onItemEsgotado: (itemId) => {
@@ -65,6 +67,30 @@ export function MenuPage() {
   const itensFiltrados = categoriaAtiva
     ? itens.filter(i => i.categoriaId === categoriaAtiva)
     : itens
+
+  const onCatDragStart = (e: React.MouseEvent) => {
+    const el = catScrollRef.current
+    if (!el) return
+    catDrag.current = { active: true, startX: e.pageX - el.offsetLeft, scrollLeft: el.scrollLeft, moved: false }
+    el.style.cursor = 'grabbing'
+  }
+
+  const onCatDragMove = (e: React.MouseEvent) => {
+    if (!catDrag.current.active) return
+    e.preventDefault()
+    const el = catScrollRef.current
+    if (!el) return
+    const x = e.pageX - el.offsetLeft
+    const walk = x - catDrag.current.startX
+    if (Math.abs(walk) > 4) catDrag.current.moved = true
+    el.scrollLeft = catDrag.current.scrollLeft - walk
+  }
+
+  const onCatDragEnd = () => {
+    catDrag.current.active = false
+    if (catScrollRef.current) catScrollRef.current.style.cursor = 'grab'
+    setTimeout(() => { catDrag.current.moved = false }, 50)
+  }
 
   const totalCart = cart.reduce((acc, c) => acc + c.item.preco * c.quantidade, 0)
   const totalItensCart = cart.reduce((a, c) => a + c.quantidade, 0)
@@ -227,21 +253,49 @@ export function MenuPage() {
         </section>
 
         {/* Categorias */}
-        <nav className="flex overflow-x-auto gap-3 no-scrollbar sticky top-16 bg-gray-50/95 backdrop-blur-sm z-40 py-2 -mx-4 px-4 mb-4">
-          {categorias.map(c => (
+        <div className="sticky top-16 z-40 -mx-4 mb-4 bg-gray-50/95 px-4 py-2 backdrop-blur-sm">
+          <div className="flex items-center gap-2">
             <button
-              key={c.id}
-              onClick={() => setCategoriaAtiva(c.id)}
-              className={`flex-none px-6 py-2.5 rounded-full font-semibold text-sm transition-all active:scale-95 whitespace-nowrap ${
-                categoriaAtiva === c.id
-                  ? 'bg-red-700 text-white font-bold'
-                  : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
-              }`}
+              type="button"
+              onClick={() => catScrollRef.current?.scrollBy({ left: -180, behavior: 'smooth' })}
+              className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-gray-200 active:scale-95"
+              aria-label="Categoria anterior"
             >
-              {c.nome}
+              <span className="material-symbols-outlined text-lg text-gray-700">chevron_left</span>
             </button>
-          ))}
-        </nav>
+            <nav
+              ref={catScrollRef}
+              className="no-scrollbar flex flex-1 gap-3 overflow-x-auto px-1"
+              style={{ cursor: 'grab', userSelect: 'none' }}
+              onMouseDown={onCatDragStart}
+              onMouseMove={onCatDragMove}
+              onMouseUp={onCatDragEnd}
+              onMouseLeave={onCatDragEnd}
+            >
+              {categorias.map(c => (
+                <button
+                  key={c.id}
+                  onClick={() => { if (!catDrag.current.moved) setCategoriaAtiva(c.id) }}
+                  className={`flex-none px-6 py-2.5 rounded-full font-semibold text-sm transition-all active:scale-95 whitespace-nowrap ${
+                    categoriaAtiva === c.id
+                      ? 'bg-red-700 text-white font-bold'
+                      : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                  }`}
+                >
+                  {c.nome}
+                </button>
+              ))}
+            </nav>
+            <button
+              type="button"
+              onClick={() => catScrollRef.current?.scrollBy({ left: 180, behavior: 'smooth' })}
+              className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-gray-200 active:scale-95"
+              aria-label="Proxima categoria"
+            >
+              <span className="material-symbols-outlined text-lg text-gray-700">chevron_right</span>
+            </button>
+          </div>
+        </div>
 
         {/* Itens */}
         {erro && (

@@ -8,6 +8,9 @@ using RestauranteDigital.Api.Modules.Auth.Models;
 using RestauranteDigital.Api.Modules.Auth.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+var frontendUrl = string.IsNullOrWhiteSpace(builder.Configuration["App:FrontendUrl"])
+    ? "http://localhost:5173"
+    : builder.Configuration["App:FrontendUrl"]!.TrimEnd('/');
 
 // Database
 if (!builder.Environment.IsEnvironment("Testing"))
@@ -57,8 +60,7 @@ builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.WithOrigins(
-                builder.Configuration["App:FrontendUrl"] ?? "http://localhost:5173")
+        policy.WithOrigins(frontendUrl)
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials();
@@ -81,7 +83,14 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors();
 app.UseHttpsRedirection();
-app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = context =>
+    {
+        if (context.Context.Request.Path.StartsWithSegments("/demo-images"))
+            context.Context.Response.Headers.CacheControl = "public,max-age=604800";
+    }
+});
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

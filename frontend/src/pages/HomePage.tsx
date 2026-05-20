@@ -4,10 +4,10 @@ import { api } from '../api/client'
 import type { MesaPublicQr } from '../api/types'
 
 const foodImages = [
-  '/demo-images/burger-artesanal.png',
-  '/demo-images/risoto-de-cogumelos.png',
-  '/demo-images/suco-natural.png',
-  '/demo-images/brownie-com-sorvete.png',
+  '/demo-images/burger-artesanal.jpg',
+  '/demo-images/risoto-de-cogumelos.jpg',
+  '/demo-images/suco-natural.jpg',
+  '/demo-images/brownie-com-sorvete.jpg',
 ]
 
 const flows = [

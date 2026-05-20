@@ -34,27 +34,27 @@ public static class DemoDataSeeder
         {
             new CategoriaSeed("Entradas", 1, true, new[]
             {
-                new ItemSeed("Bruschetta da casa", "Tomate marinado, manjericao e azeite sobre pao artesanal.", 24.90m, "/demo-images/bruschetta-da-casa.png"),
-                new ItemSeed("Bolinho de queijo", "Porcao crocante com molho de pimenta suave.", 29.90m, "/demo-images/bolinhos-de-queijo.png"),
-                new ItemSeed("Salada fresca", "Folhas, legumes grelhados e vinagrete de ervas.", 27.90m, "/demo-images/salada-fresca.png", false),
+                new ItemSeed("Bruschetta da casa", "Tomate marinado, manjericao e azeite sobre pao artesanal.", 24.90m, "/demo-images/bruschetta-da-casa.jpg"),
+                new ItemSeed("Bolinho de queijo", "Porcao crocante com molho de pimenta suave.", 29.90m, "/demo-images/bolinhos-de-queijo.jpg"),
+                new ItemSeed("Salada fresca", "Folhas, legumes grelhados e vinagrete de ervas.", 27.90m, "/demo-images/salada-fresca.jpg", false),
             }),
             new CategoriaSeed("Pratos principais", 2, true, new[]
             {
-                new ItemSeed("Risoto de cogumelos", "Arroz arboreo, mix de cogumelos e parmesao.", 54.90m, "/demo-images/risoto-de-cogumelos.png"),
-                new ItemSeed("Burger artesanal", "Blend bovino, queijo, cebola caramelizada e batata rustica.", 42.90m, "/demo-images/burger-artesanal.png"),
-                new ItemSeed("Frango grelhado", "File de frango, pure de batata e legumes.", 39.90m, "/demo-images/frango-grelhado.png"),
-                new ItemSeed("Massa ao pesto", "Talharim fresco com pesto de manjericao e castanhas.", 46.90m, "/demo-images/massa-ao-pesto.png"),
+                new ItemSeed("Risoto de cogumelos", "Arroz arboreo, mix de cogumelos e parmesao.", 54.90m, "/demo-images/risoto-de-cogumelos.jpg"),
+                new ItemSeed("Burger artesanal", "Blend bovino, queijo, cebola caramelizada e batata rustica.", 42.90m, "/demo-images/burger-artesanal.jpg"),
+                new ItemSeed("Frango grelhado", "File de frango, pure de batata e legumes.", 39.90m, "/demo-images/frango-grelhado.jpg"),
+                new ItemSeed("Massa ao pesto", "Talharim fresco com pesto de manjericao e castanhas.", 46.90m, "/demo-images/massa-ao-pesto.jpg"),
             }),
             new CategoriaSeed("Bebidas", 3, false, new[]
             {
-                new ItemSeed("Suco natural", "Laranja, limao ou abacaxi com hortela.", 12.90m, "/demo-images/suco-natural.png", false),
-                new ItemSeed("Refrigerante", "Lata 350 ml.", 8.90m, "/demo-images/refrigerante.png", false),
-                new ItemSeed("Agua com gas", "Garrafa 500 ml.", 6.90m, "/demo-images/agua-com-gas.png", false),
+                new ItemSeed("Suco natural", "Laranja, limao ou abacaxi com hortela.", 12.90m, "/demo-images/suco-natural.jpg", false),
+                new ItemSeed("Refrigerante", "Lata 350 ml.", 8.90m, "/demo-images/refrigerante.jpg", false),
+                new ItemSeed("Agua com gas", "Garrafa 500 ml.", 6.90m, "/demo-images/agua-com-gas.jpg", false),
             }),
             new CategoriaSeed("Sobremesas", 4, true, new[]
             {
-                new ItemSeed("Pudim classico", "Pudim de leite com calda de caramelo.", 18.90m, "/demo-images/pudim-classico.png"),
-                new ItemSeed("Brownie com sorvete", "Brownie quente com sorvete de creme.", 24.90m, "/demo-images/brownie-com-sorvete.png"),
+                new ItemSeed("Pudim classico", "Pudim de leite com calda de caramelo.", 18.90m, "/demo-images/pudim-classico.jpg"),
+                new ItemSeed("Brownie com sorvete", "Brownie quente com sorvete de creme.", 24.90m, "/demo-images/brownie-com-sorvete.jpg"),
             }),
         };
 

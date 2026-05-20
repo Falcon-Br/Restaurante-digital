@@ -14,11 +14,33 @@ namespace RestauranteDigital.Api.Modules.Mesas.Controllers;
 [Route("api/mesas")]
 public class MesasController(AppDbContext db, IConfiguration config, IHubContext<RestauranteHub> hub) : ControllerBase
 {
+    private string FrontendUrl =>
+        string.IsNullOrWhiteSpace(config["App:FrontendUrl"])
+            ? "http://localhost:5173"
+            : config["App:FrontendUrl"]!.TrimEnd('/');
+
+    private string RequestFrontendUrl
+    {
+        get
+        {
+            foreach (var header in new[] { "Origin", "Referer" })
+            {
+                if (!Request.Headers.TryGetValue(header, out var value)) continue;
+                if (!Uri.TryCreate(value.ToString(), UriKind.Absolute, out var uri)) continue;
+                if (uri.Scheme is not ("http" or "https")) continue;
+
+                return uri.GetLeftPart(UriPartial.Authority);
+            }
+
+            return FrontendUrl;
+        }
+    }
+
     private string GetMenuUrl(string token) =>
-        $"{config["App:FrontendUrl"] ?? "http://localhost:5173"}/menu/{token}";
+        $"{RequestFrontendUrl}/menu/{token}";
 
     private string GetQrPageUrl(string token) =>
-        $"{config["App:FrontendUrl"] ?? "http://localhost:5173"}/qr/{token}";
+        $"{RequestFrontendUrl}/qr/{token}";
 
     private string GetQrImageUrl(string token) =>
         $"/api/mesas/token/{token}/qrcode";
