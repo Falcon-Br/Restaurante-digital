@@ -116,6 +116,29 @@ textarea {
   box-shadow: 0 8px 18px rgba(66, 128, 87, 0.12);
 }
 
+.login-demo-button {
+  background: #f2f3f9;
+  border: 1px solid #e6e8ee;
+  color: #191c20;
+}
+
+.login-demo-button:not(:disabled):hover {
+  background: #b90014;
+  border-color: #b90014;
+  color: #ffffff;
+  box-shadow: 0 10px 22px rgba(185, 0, 20, 0.2);
+  transform: translateY(-1px);
+}
+
+.login-demo-button:not(:disabled):hover .login-demo-icon,
+.login-demo-button:not(:disabled):hover .login-demo-email {
+  color: #fff7ed !important;
+}
+
+.login-demo-button:not(:disabled):hover .login-demo-email {
+  opacity: 0.92;
+}
+
 .ready-highlight {
   animation: ready-highlight 2.2s ease both;
 }

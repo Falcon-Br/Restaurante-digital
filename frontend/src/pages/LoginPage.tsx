@@ -451,19 +451,14 @@ export function LoginPage() {
                   type="button"
                   onClick={() => handleDemoLogin(profile)}
                   disabled={loading || demoLoading !== null}
-                  className="flex items-center gap-2 rounded-xl px-3 py-3 text-left transition-all disabled:opacity-60"
-                  style={{
-                    background: '#f2f3f9',
-                    color: '#191c20',
-                    border: '1px solid #e6e8ee',
-                  }}
+                  className="login-demo-button flex items-center gap-2 rounded-xl px-3 py-3 text-left transition-all disabled:opacity-60"
                 >
-                  <span className={`material-symbols-outlined ${demoLoading === profile.role ? 'animate-spin' : ''}`} style={{ color: '#b90014', fontSize: '1.25rem' }}>
+                  <span className={`login-demo-icon material-symbols-outlined ${demoLoading === profile.role ? 'animate-spin' : ''}`} style={{ color: '#b90014', fontSize: '1.25rem' }}>
                     {demoLoading === profile.role ? 'progress_activity' : profile.icon}
                   </span>
                   <span className="min-w-0">
                     <span className="block text-sm font-bold leading-tight">{profile.label}</span>
-                    <span className="block text-[11px] truncate" style={{ color: '#926e6b' }}>
+                    <span className="login-demo-email block text-[11px] truncate" style={{ color: '#926e6b' }}>
                       {profile.email}
                     </span>
                   </span>
