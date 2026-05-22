@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { api } from '../../api/client'
 import { useSignalR } from '../../hooks/useSignalR'
 import { formatCurrencyBRL } from '../../utils/currency'
+import { afterModalExit } from '../../utils/modalTransition'
 import type { Item, Categoria, KdsFilaResponse, Mesa } from '../../api/types'
 
 interface CartItem {
@@ -118,10 +119,10 @@ export function MenuPage() {
 
   const fecharModalItem = () => {
     setModalItemClosing(true)
-    setTimeout(() => {
+    afterModalExit(() => {
       setModalItem(null)
       setModalItemClosing(false)
-    }, 160)
+    })
   }
 
   const abrirConfirmarPedido = () => {
@@ -131,10 +132,10 @@ export function MenuPage() {
 
   const fecharConfirmarPedido = () => {
     setConfirmarPedidoClosing(true)
-    setTimeout(() => {
+    afterModalExit(() => {
       setConfirmarPedido(false)
       setConfirmarPedidoClosing(false)
-    }, 160)
+    })
   }
 
   const removerDoCart = (index: number) => {
@@ -392,7 +393,7 @@ export function MenuPage() {
 
       {/* Modal adicionar item */}
       {modalItem && (
-        <div className={`modal-backdrop fixed inset-0 bg-black/50 flex items-end z-20 ${modalItemClosing ? 'modal-exit' : ''}`} onClick={fecharModalItem}>
+        <div className={`modal-backdrop fixed inset-0 z-[60] flex items-end bg-black/50 ${modalItemClosing ? 'modal-exit' : ''}`} onClick={fecharModalItem}>
           <div
             className="modal-surface bg-white rounded-t-2xl w-full p-6 max-w-md mx-auto"
             onClick={e => e.stopPropagation()}

@@ -181,6 +181,25 @@ describe('AdminPage', () => {
 
   // ── Nova Categoria ─────────────────────────────────────────────────────────
 
+  describe('Exclusao de item no modal de categoria', () => {
+    it('troca o modal de itens pela confirmacao de exclusao e volta ao cancelar', async () => {
+      const user = userEvent.setup()
+      await renderPage()
+      await user.click(screen.getByText('Lanches'))
+      await waitFor(() => expect(screen.getByText('Burger')).toBeInTheDocument())
+
+      await user.click(screen.getByRole('button', { name: 'Excluir Burger' }))
+
+      expect(screen.getByText('Excluir item?')).toBeInTheDocument()
+      expect(screen.queryByText('Burger')).not.toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: /cancelar/i }))
+
+      await waitFor(() => expect(screen.getByText('Burger')).toBeInTheDocument())
+      expect(screen.queryByText('Excluir item?')).not.toBeInTheDocument()
+    })
+  })
+
   describe('Nova Categoria', () => {
     it('abre modal ao clicar em "Nova Categoria"', async () => {
       await renderPage()

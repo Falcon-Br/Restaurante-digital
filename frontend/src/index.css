@@ -125,6 +125,8 @@ textarea {
 }
 
 .modal-backdrop {
+  overflow: hidden;
+  overscroll-behavior: contain;
   animation: modal-backdrop-enter 180ms ease both;
 }
 

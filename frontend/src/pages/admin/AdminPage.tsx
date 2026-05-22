@@ -4,6 +4,7 @@ import { api } from '../../api/client'
 import { useAuth } from '../../context/useAuth'
 import { useSignalR } from '../../hooks/useSignalR'
 import { formatCurrencyBRL, maskCurrencyBRL, parseCurrencyBRL } from '../../utils/currency'
+import { afterModalExit } from '../../utils/modalTransition'
 import type { Item, Categoria, Mesa } from '../../api/types'
 
 type Tab = 'cardapio' | 'mesas'
@@ -59,14 +60,6 @@ const inputStyle: React.CSSProperties = {
   width: '100%',
 }
 
-function afterModalExit(action: () => void) {
-  if (import.meta.env.MODE === 'test') {
-    action()
-    return
-  }
-  setTimeout(action, 160)
-}
-
 function SavingLabel({ saving, idleText }: { saving: boolean; idleText: string }) {
   return (
     <span className="inline-flex items-center justify-center gap-2">
@@ -105,6 +98,7 @@ export function AdminPage() {
   const [itemModalOrigemCat, setItemModalOrigemCat] = useState<Categoria | null>(null)
   const [modalExcluirItem, setModalExcluirItem] = useState<Item | null>(null)
   const [modalExcluirItemClosing, setModalExcluirItemClosing] = useState(false)
+  const [itemExcluirRetornoCat, setItemExcluirRetornoCat] = useState<Categoria | null>(null)
 
   // Modal excluir
   const [modalExcluirCat, setModalExcluirCat] = useState<number | null>(null)
@@ -318,16 +312,24 @@ export function AdminPage() {
     }
   }
 
-  const abrirModalExcluirItem = (item: Item) => {
+  const abrirModalExcluirItem = (item: Item, retornarParaCategoria?: Categoria | null) => {
     setModalExcluirItemClosing(false)
+    setItemExcluirRetornoCat(retornarParaCategoria ?? null)
     setModalExcluirItem(item)
   }
 
   const fecharModalExcluirItem = () => {
+    const retorno = itemExcluirRetornoCat
     setModalExcluirItemClosing(true)
     afterModalExit(() => {
       setModalExcluirItem(null)
       setModalExcluirItemClosing(false)
+      setItemExcluirRetornoCat(null)
+      if (retorno) {
+        setModalTodasCatsClosing(false)
+        setModalTodasCats(true)
+        setCatSelecionadaModal(retorno)
+      }
     })
   }
 
@@ -1166,7 +1168,16 @@ export function AdminPage() {
                                 style={{ background: '#f2f3f9', color: '#5d3f3c' }}>
                                 <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>edit</span>
                               </button>
-                              <button onClick={() => abrirModalExcluirItem(item)}
+                              <button onClick={() => {
+                                const retorno = catSelecionadaModal
+                                setModalTodasCatsClosing(true)
+                                afterModalExit(() => {
+                                  setModalTodasCats(false)
+                                  setModalTodasCatsClosing(false)
+                                  abrirModalExcluirItem(item, retorno)
+                                })
+                              }}
+                                aria-label={`Excluir ${item.nome}`}
                                 className="w-10 h-10 flex items-center justify-center rounded-xl transition-colors"
                                 style={{ background: '#fef2f2', color: '#b90014' }}>
                                 <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>delete</span>

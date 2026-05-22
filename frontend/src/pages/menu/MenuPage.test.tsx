@@ -107,4 +107,19 @@ describe('MenuPage', () => {
 
     expect(screen.queryByText('Observação (opcional)')).not.toBeInTheDocument()
   })
+  it('mantem o modal de adicionar acima da revisao quando ja existe item no carrinho', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await waitFor(() => expect(screen.getByText('Bruschetta')).toBeInTheDocument())
+
+    await user.click(screen.getByText('Bruschetta'))
+    await user.click(screen.getByRole('button', { name: 'Adicionar' }))
+    expect(screen.getByRole('button', { name: /Revisar/i })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Bebidas' }))
+    await user.click(screen.getByText('Suco natural'))
+
+    const modalInput = screen.getByPlaceholderText('ex: sem cebola')
+    expect(modalInput.closest('.modal-backdrop')).toHaveClass('z-[60]')
+  })
 })

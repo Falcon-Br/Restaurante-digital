@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { api } from '../../api/client'
 import { useSignalR } from '../../hooks/useSignalR'
 import { useAuth } from '../../context/useAuth'
+import { afterModalExit } from '../../utils/modalTransition'
 import type { KdsPedidoItem, KdsFilaResponse } from '../../api/types'
 
 type FiltroFila = 'todos' | 'urgentes' | 'recentes'
@@ -124,7 +125,7 @@ export function CozinhaPage() {
   const confirmarEsgotado = async () => {
     if (!modalEsgotado) return
     const { itemId, itemNome } = modalEsgotado
-    setModalEsgotado(null)
+    fecharModalEsgotado()
     try {
       await api.patch(`/kds/${itemId}/esgotado`, {})
       setItens(prev => prev.filter(i => i.itemId !== itemId))
@@ -141,10 +142,10 @@ export function CozinhaPage() {
 
   const fecharModalEsgotado = () => {
     setModalEsgotadoClosing(true)
-    setTimeout(() => {
+    afterModalExit(() => {
       setModalEsgotado(null)
       setModalEsgotadoClosing(false)
-    }, 160)
+    })
   }
 
   const termoBusca = normalizeSearch(busca)

@@ -4,6 +4,7 @@ import { api } from '../../api/client'
 import { useAuth } from '../../context/useAuth'
 import { useSignalR } from '../../hooks/useSignalR'
 import { formatCurrencyBRL } from '../../utils/currency'
+import { afterModalExit } from '../../utils/modalTransition'
 import type { Mesa, Item, Categoria, Comanda, Pedido, PedidoItemStatus } from '../../api/types'
 
 type CartItem = { itemId: number; nome: string; preco: number; quantidade: number; observacao: string }
@@ -343,37 +344,37 @@ export function GarcomPage() {
 
   const confirmarCriarComanda = () => {
     setModalConfirmarComandaClosing(true)
-    setTimeout(() => {
+    afterModalExit(() => {
       setModalConfirmarComanda(false)
       setModalConfirmarComandaClosing(false)
       setNomeComanda('')
       setModalNomeComandaClosing(false)
       setModalNomeComanda(true)
-    }, 160)
+    })
   }
 
   const fecharConfirmarComanda = () => {
     setModalConfirmarComandaClosing(true)
-    setTimeout(() => {
+    afterModalExit(() => {
       setModalConfirmarComanda(false)
       setModalConfirmarComandaClosing(false)
-    }, 160)
+    })
   }
 
   const fecharNomeComanda = () => {
     setModalNomeComandaClosing(true)
-    setTimeout(() => {
+    afterModalExit(() => {
       setModalNomeComanda(false)
       setModalNomeComandaClosing(false)
-    }, 160)
+    })
   }
 
   const fecharSelecionarComanda = () => {
     setModalSelecionarComandaClosing(true)
-    setTimeout(() => {
+    afterModalExit(() => {
       setModalSelecionarComanda(false)
       setModalSelecionarComandaClosing(false)
-    }, 160)
+    })
   }
 
   const criarComanda = async () => {
@@ -396,10 +397,10 @@ export function GarcomPage() {
 
   const fecharModalFecharComanda = () => {
     setModalFecharComandaClosing(true)
-    setTimeout(() => {
+    afterModalExit(() => {
       setModalFecharComanda(null)
       setModalFecharComandaClosing(false)
-    }, 160)
+    })
   }
 
   const confirmarFecharComanda = async () => {
